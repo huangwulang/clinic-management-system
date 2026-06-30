@@ -31,6 +31,10 @@ clinic:
       - http://127.0.0.1:5174
       - http://localhost:7777
       - http://127.0.0.1:7777
+      - https://clinic-management-system.pages.dev
+      - https://*.clinic-management-system.pages.dev
+      - http://localhost:4173
+      - http://127.0.0.1:4173
   auth:
     jwt-secret: ${CLINIC_JWT_SECRET:clinic-management-system-jwt-secret-change-in-production-2026}
     issuer: clinic-server
