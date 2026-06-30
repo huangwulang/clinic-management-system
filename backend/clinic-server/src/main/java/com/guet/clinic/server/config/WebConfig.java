@@ -43,12 +43,8 @@ public class WebConfig implements WebMvcConfigurer {
         config.setAllowCredentials(true);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        // 使用 setAllowedOriginPatterns 支持通配符（Spring 5.3+）
-        config.setAllowedOriginPatterns(
-                allowedOrigins.stream()
-                        .map(origin -> origin.replace(".", "\\.").replace("*", ".*"))
-                        .toList()
-        );
+        // Spring 的 setAllowedOriginPatterns 原生支持 * 通配符（Ant 风格）
+        config.setAllowedOriginPatterns(allowedOrigins);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
