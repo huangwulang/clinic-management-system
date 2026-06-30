@@ -10,6 +10,7 @@ Thumbs.db
 # Frontend
 frontend/node_modules/
 frontend/dist/
+dist/
 
 # Backend
 backend/target/

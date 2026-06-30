@@ -4,7 +4,7 @@
   "private": true,
   "description": "诊所管理系统 - Cloudflare Pages 部署入口",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install && npm run build && cp -r dist ../dist",
     "dev": "cd frontend && npm run dev"
   },
   "engines": {
