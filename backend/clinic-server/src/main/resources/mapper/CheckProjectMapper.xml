@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.CheckProjectMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.CheckProject">
+    SELECT id, project_code, name, category, cost_price, retail_price, price, unit, invoice_item, body_part, allow_member_discount, status, creator, remark, created_at, updated_at, deleted
+    FROM clinic_check_project
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (project_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR category LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_check_project
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (project_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR category LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.CheckProject">
+    SELECT id, project_code, name, category, cost_price, retail_price, price, unit, invoice_item, body_part, allow_member_discount, status, creator, remark, created_at, updated_at, deleted
+    FROM clinic_check_project
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_check_project (project_code, name, category, cost_price, retail_price, price, unit, invoice_item, body_part, allow_member_discount, status, creator, remark, created_at, updated_at, deleted)
+    VALUES (#{projectCode}, #{name}, #{category}, #{costPrice}, #{retailPrice}, #{price}, #{unit}, #{invoiceItem}, #{bodyPart}, #{allowMemberDiscount}, #{status}, #{creator}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_check_project
+    <set>
+      <if test="projectCode != null">project_code = #{projectCode},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="category != null">category = #{category},</if>
+      <if test="costPrice != null">cost_price = #{costPrice},</if>
+      <if test="retailPrice != null">retail_price = #{retailPrice},</if>
+      <if test="price != null">price = #{price},</if>
+      <if test="unit != null">unit = #{unit},</if>
+      <if test="invoiceItem != null">invoice_item = #{invoiceItem},</if>
+      <if test="bodyPart != null">body_part = #{bodyPart},</if>
+      <if test="allowMemberDiscount != null">allow_member_discount = #{allowMemberDiscount},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="creator != null">creator = #{creator},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_check_project
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

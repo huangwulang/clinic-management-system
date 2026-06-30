@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.InventoryLogMapper">
+  <sql id="columns">id, inventory_id, drug_id, business_type, business_no, change_quantity, quantity_before, quantity_after, operator, remark, created_at, updated_at, deleted</sql>
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.InventoryLog">
+    SELECT <include refid="columns"/> FROM clinic_inventory_log WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (business_no LIKE CONCAT('%', #{keyword}, '%') OR business_type LIKE CONCAT('%', #{keyword}, '%'))</if>
+    ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="count" resultType="long">
+    SELECT COUNT(1) FROM clinic_inventory_log WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (business_no LIKE CONCAT('%', #{keyword}, '%') OR business_type LIKE CONCAT('%', #{keyword}, '%'))</if>
+  </select>
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.InventoryLog">
+    SELECT <include refid="columns"/> FROM clinic_inventory_log WHERE id = #{id} AND deleted = 0
+  </select>
+  <select id="selectByInventoryId" resultType="com.guet.clinic.pojo.entity.InventoryLog">
+    SELECT <include refid="columns"/> FROM clinic_inventory_log WHERE inventory_id = #{inventoryId} AND deleted = 0 ORDER BY id DESC
+  </select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_inventory_log (inventory_id, drug_id, business_type, business_no, change_quantity, quantity_before, quantity_after, operator, remark, created_at, updated_at, deleted)
+    VALUES (#{inventoryId}, #{drugId}, #{businessType}, #{businessNo}, #{changeQuantity}, #{quantityBefore}, #{quantityAfter}, #{operator}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+  <update id="update">
+    UPDATE clinic_inventory_log SET business_type=#{businessType}, business_no=#{businessNo}, change_quantity=#{changeQuantity},
+      quantity_before=#{quantityBefore}, quantity_after=#{quantityAfter}, operator=#{operator}, remark=#{remark}, updated_at=#{updatedAt}
+    WHERE id=#{id} AND deleted=0
+  </update>
+  <update id="softDelete">UPDATE clinic_inventory_log SET deleted=1, updated_at=NOW() WHERE id=#{id}</update>
+</mapper>

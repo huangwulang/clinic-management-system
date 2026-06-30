@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.ReportMapper">
+  <select id="dashboardSummary" resultType="map">
+    SELECT
+      (SELECT COUNT(*) FROM clinic_registration WHERE deleted = 0 AND DATE(visit_time) = CURDATE()) AS todayRegistrationCount,
+      (SELECT COUNT(*) FROM clinic_consultation WHERE deleted = 0 AND DATE(created_at) = CURDATE()) AS todayVisitCount,
+      (SELECT
+         COALESCE(SUM(CASE
+           WHEN status IN ('PAID', 'REFUNDED') AND paid_at IS NOT NULL AND DATE(paid_at) = CURDATE()
+           THEN COALESCE(paid_amount, 0) ELSE 0 END), 0)
+         - COALESCE(SUM(CASE
+           WHEN refunded_at IS NOT NULL AND DATE(refunded_at) = CURDATE()
+           THEN COALESCE(refund_amount, 0) ELSE 0 END), 0)
+       FROM clinic_charge_order WHERE deleted = 0) AS todayIncome,
+      (SELECT COUNT(*) FROM clinic_member WHERE deleted = 0 AND open_date = CURDATE()) AS todayMemberCount,
+      (SELECT COUNT(*) FROM clinic_charge_order WHERE deleted = 0 AND status IN ('PENDING','PARTIAL')) AS pendingChargeCount
+  </select>
+  <select id="dashboardTrends" resultType="map">
+    SELECT statDate, SUM(visitCount) AS visitCount, COALESCE(SUM(income), 0) AS income
+    FROM (
+      SELECT DATE(paid_at) AS statDate,
+             COUNT(*) AS visitCount,
+             COALESCE(SUM(paid_amount), 0) AS income
+      FROM clinic_charge_order
+      WHERE deleted = 0 AND status IN ('PAID', 'REFUNDED') AND paid_at IS NOT NULL
+      <if test="startDate != null">AND DATE(paid_at) &gt;= #{startDate}</if>
+      <if test="endDate != null">AND DATE(paid_at) &lt;= #{endDate}</if>
+      GROUP BY DATE(paid_at)
+      UNION ALL
+      SELECT DATE(refunded_at) AS statDate,
+             0 AS visitCount,
+             -COALESCE(SUM(refund_amount), 0) AS income
+      FROM clinic_charge_order
+      WHERE deleted = 0 AND refunded_at IS NOT NULL
+      <if test="startDate != null">AND DATE(refunded_at) &gt;= #{startDate}</if>
+      <if test="endDate != null">AND DATE(refunded_at) &lt;= #{endDate}</if>
+      GROUP BY DATE(refunded_at)
+    ) daily
+    GROUP BY statDate ORDER BY statDate
+  </select>
+  <select id="dashboardRankings" resultType="map">
+    <choose>
+      <when test="type == 'drug'">
+        SELECT drug_name AS name, SUM(quantity) AS value FROM clinic_inventory WHERE deleted = 0 GROUP BY drug_id, drug_name ORDER BY value DESC LIMIT #{limit}
+      </when>
+      <when test="type == 'source'">
+        SELECT COALESCE(source, '未知') AS name, COUNT(*) AS value FROM clinic_patient WHERE deleted = 0 GROUP BY source ORDER BY value DESC LIMIT #{limit}
+      </when>
+      <when test="type == 'member'">
+        SELECT CASE WHEN pay_method = '会员卡' THEN '会员消费' ELSE '非会员消费' END AS name,
+               SUM(COALESCE(paid_amount, 0) - COALESCE(refund_amount, 0)) AS value
+        FROM clinic_charge_order
+        WHERE deleted = 0 AND status IN ('PAID', 'REFUNDED') AND paid_at IS NOT NULL AND DATE(paid_at) = CURDATE()
+        GROUP BY CASE WHEN pay_method = '会员卡' THEN '会员消费' ELSE '非会员消费' END
+        ORDER BY value DESC LIMIT #{limit}
+      </when>
+      <otherwise>
+        SELECT COALESCE(doctor_name, '未分配') AS name, COUNT(*) AS value FROM clinic_registration WHERE deleted = 0 GROUP BY doctor_name ORDER BY value DESC LIMIT #{limit}
+      </otherwise>
+    </choose>
+  </select>
+  <select id="workbenchVisits" resultType="map">
+    SELECT r.id, r.registration_no AS registrationNo, r.patient_id AS patientId, r.patient_name AS patientName,
+           r.phone, r.gender, r.age, r.department_name AS departmentName, r.doctor_id AS doctorId,
+           r.doctor_name AS doctorName, r.visit_type AS visitType, r.visit_time AS visitTime, r.status,
+           r.registration_fee AS registrationFee, r.diagnosis_fee AS diagnosisFee, r.remark,
+           COALESCE(m.level_name, p.member_level) AS memberLevel
+    FROM clinic_registration r
+    LEFT JOIN clinic_patient p ON p.id = r.patient_id AND p.deleted = 0
+    LEFT JOIN clinic_member m ON m.patient_id = r.patient_id AND m.deleted = 0
+    WHERE r.deleted = 0
+    <if test="status != null and status != ''">
+      <choose>
+        <when test="status == 'PENDING'">AND r.status IN ('PENDING', 'WAITING')</when>
+        <when test="status == 'PROCESSING'">AND r.status IN ('PROCESSING', 'IN_PROGRESS')</when>
+        <when test="status == 'DONE'">AND r.status IN ('DONE', 'COMPLETED', 'FINISHED')</when>
+        <otherwise>AND r.status = #{status}</otherwise>
+      </choose>
+    </if>
+    <if test="keyword != null and keyword != ''">AND (r.patient_name LIKE CONCAT('%',#{keyword},'%') OR r.phone LIKE CONCAT('%',#{keyword},'%') OR r.registration_no LIKE CONCAT('%',#{keyword},'%'))</if>
+    <if test="department != null and department != ''">AND r.department_name = #{department}</if>
+    <if test="doctor != null and doctor != ''">AND r.doctor_name = #{doctor}</if>
+    <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+    <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+    ORDER BY r.visit_time DESC
+  </select>
+  <select id="chargeStatistics" resultType="map">
+    <choose>
+      <when test="type == 'stored'">
+        SELECT t.id,
+               CASE UPPER(COALESCE(t.transaction_type, ''))
+                 WHEN 'RECHARGE' THEN '充值'
+                 WHEN 'REFUND' THEN '充值退款'
+                 WHEN 'CONSUME' THEN '消费'
+                 WHEN 'CONSUMPTION' THEN '消费'
+                 WHEN 'CONSUME_REFUND' THEN '消费退款'
+                 WHEN 'CONSUMPTION_REFUND' THEN '消费退款'
+                 WHEN 'ADJUST_BALANCE' THEN '余额调整'
+                 WHEN 'BALANCE_ADJUST' THEN '余额调整'
+                 WHEN 'ADJUST_POINTS' THEN '积分调整'
+                 WHEN 'POINTS_ADJUST' THEN '积分调整'
+                 ELSE COALESCE(t.transaction_type, '')
+               END AS tradeType,
+               m.card_no AS cardNo,
+               m.patient_name AS memberName, t.amount, 0 AS gift, t.amount AS total,
+               t.balance_after AS balance, '会员卡' AS payment, t.created_at AS tradeTime, t.operator
+        FROM clinic_member_transaction t
+        LEFT JOIN clinic_member m ON m.id = t.member_id AND m.deleted = 0
+        WHERE t.deleted = 0
+        <if test="startDate != null">AND DATE(t.created_at) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(t.created_at) &lt;= #{endDate}</if>
+        <if test="tradeType != null and tradeType != '' and tradeType != '全部'">
+          <choose>
+            <when test="tradeType == '充值'">AND (UPPER(t.transaction_type) = 'RECHARGE' OR t.transaction_type = '充值')</when>
+            <when test="tradeType == '充值退款'">AND (UPPER(t.transaction_type) = 'REFUND' OR t.transaction_type = '充值退款')</when>
+            <when test="tradeType == '消费'">AND (UPPER(t.transaction_type) IN ('CONSUME', 'CONSUMPTION') OR t.transaction_type = '消费')</when>
+            <when test="tradeType == '消费退款'">AND (UPPER(t.transaction_type) IN ('CONSUME_REFUND', 'CONSUMPTION_REFUND') OR t.transaction_type = '消费退款')</when>
+            <otherwise>AND t.transaction_type = #{tradeType}</otherwise>
+          </choose>
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (m.card_no LIKE CONCAT('%', #{keyword}, '%') OR m.patient_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY t.id DESC
+      </when>
+      <when test="type == 'cashier'">
+        SELECT COALESCE(cashier, '未分配') AS cashier, COALESCE(department_name, '未分配') AS department,
+               COUNT(*) AS chargeCount,
+               SUM(CASE WHEN refund_amount &gt; 0 THEN 1 ELSE 0 END) AS refundCount,
+               COALESCE(SUM(receivable_amount), 0) AS receivable,
+               COALESCE(SUM(discount_amount), 0) AS discount,
+               COALESCE(SUM(paid_amount - COALESCE(refund_amount, 0)), 0) AS received,
+               COALESCE(SUM(CASE WHEN pay_method = '医保' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '医保' THEN refund_amount ELSE 0 END), 0) AS medical,
+               COALESCE(SUM(CASE WHEN pay_method = '会员卡' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '会员卡' THEN refund_amount ELSE 0 END), 0) AS memberCard,
+               COALESCE(SUM(CASE WHEN pay_method = '现金' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '现金' THEN refund_amount ELSE 0 END), 0) AS cash,
+               COALESCE(SUM(CASE WHEN pay_method = '支付宝' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '支付宝' THEN refund_amount ELSE 0 END), 0) AS alipay,
+               COALESCE(SUM(CASE WHEN pay_method = '微信' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '微信' THEN refund_amount ELSE 0 END), 0) AS wechat,
+               COALESCE(SUM(CASE WHEN pay_method = '银行卡' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '银行卡' THEN refund_amount ELSE 0 END), 0) AS bank
+        FROM clinic_charge_order
+        WHERE deleted = 0
+        <if test="startDate != null">AND DATE(COALESCE(paid_at, created_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(paid_at, created_at)) &lt;= #{endDate}</if>
+        <if test="department != null and department != '' and department != '全部'">AND department_name = #{department}</if>
+        <if test="cashier != null and cashier != '' and cashier != '全部'">AND cashier = #{cashier}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%')
+               OR cashier LIKE CONCAT('%', #{keyword}, '%') OR department_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        GROUP BY cashier, department_name ORDER BY received DESC
+      </when>
+      <when test="type == 'department'">
+        SELECT COALESCE(department_name, '未分配') AS department, COUNT(*) AS visits,
+               COALESCE(SUM(paid_amount - COALESCE(refund_amount, 0)), 0) AS received,
+               COALESCE(SUM(CASE WHEN pay_method = '医保' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '医保' THEN refund_amount ELSE 0 END), 0) AS medical,
+               COALESCE(SUM(CASE WHEN pay_method = '会员卡' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '会员卡' THEN refund_amount ELSE 0 END), 0) AS memberCard,
+               COALESCE(SUM(CASE WHEN pay_method = '现金' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '现金' THEN refund_amount ELSE 0 END), 0) AS cash,
+               COALESCE(SUM(CASE WHEN pay_method = '支付宝' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '支付宝' THEN refund_amount ELSE 0 END), 0) AS alipay,
+               COALESCE(SUM(CASE WHEN pay_method = '微信' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '微信' THEN refund_amount ELSE 0 END), 0) AS wechat,
+               COALESCE(SUM(CASE WHEN pay_method = '银行卡' THEN paid_amount ELSE 0 END)
+                 - SUM(CASE WHEN refund_method = '银行卡' THEN refund_amount ELSE 0 END), 0) AS bank
+        FROM clinic_charge_order
+        WHERE deleted = 0
+        <if test="startDate != null">AND DATE(COALESCE(paid_at, created_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(paid_at, created_at)) &lt;= #{endDate}</if>
+        <if test="department != null and department != '' and department != '全部'">AND department_name = #{department}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%')
+               OR department_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        GROUP BY department_name ORDER BY received DESC
+      </when>
+      <when test="type == 'doctor'">
+        SELECT COALESCE(c.doctor_name, '未分配') AS doctor,
+               COALESCE(SUM(c.receivable_amount), 0) AS receivable,
+               COALESCE(SUM(c.discount_amount), 0) AS discount,
+               COALESCE(SUM(c.paid_amount - COALESCE(c.refund_amount, 0)), 0) AS received,
+               COUNT(*) AS visits,
+               SUM(CASE WHEN r.visit_type = '初诊' THEN 1 ELSE 0 END) AS firstVisits,
+               SUM(CASE WHEN r.visit_type = '复诊' THEN 1 ELSE 0 END) AS returnVisits,
+               COALESCE(SUM(CASE
+                 WHEN c.charge_type LIKE '%西药%' OR c.charge_type LIKE '%成药%'
+                   OR c.charge_type LIKE '%药品零售%' OR c.remark LIKE '%药品%'
+                 THEN c.paid_amount - COALESCE(c.refund_amount, 0) ELSE 0 END), 0) AS westernDrug,
+               COALESCE(SUM(CASE
+                 WHEN c.charge_type LIKE '%中药%' OR c.remark LIKE '%中药%'
+                 THEN c.paid_amount - COALESCE(c.refund_amount, 0) ELSE 0 END), 0) AS chineseDrug,
+               COALESCE(SUM(CASE
+                 WHEN c.charge_type LIKE '%检查%' OR c.charge_type LIKE '%检验%'
+                   OR c.remark REGEXP '检查|检验|心电|彩超|血常规'
+                 THEN c.paid_amount - COALESCE(c.refund_amount, 0) ELSE 0 END), 0) AS checkProject,
+               COALESCE(SUM(CASE
+                 WHEN c.charge_type LIKE '%挂号%' THEN c.paid_amount - COALESCE(c.refund_amount, 0)
+                 ELSE COALESCE(r.registration_fee, 0) END), 0) AS registration,
+               COALESCE(SUM(CASE
+                 WHEN c.charge_type LIKE '%诊疗%' THEN c.paid_amount - COALESCE(c.refund_amount, 0)
+                 ELSE COALESCE(r.diagnosis_fee, 0) END), 0) AS diagnosis
+        FROM clinic_charge_order c
+        LEFT JOIN clinic_registration r ON r.id = c.registration_id AND r.deleted = 0
+        WHERE c.deleted = 0
+        <if test="startDate != null">AND DATE(COALESCE(c.paid_at, c.created_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(c.paid_at, c.created_at)) &lt;= #{endDate}</if>
+        <if test="doctor != null and doctor != '' and doctor != '全部'">AND c.doctor_name = #{doctor}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (c.order_no LIKE CONCAT('%', #{keyword}, '%') OR c.patient_name LIKE CONCAT('%', #{keyword}, '%')
+               OR c.doctor_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        GROUP BY c.doctor_name ORDER BY received DESC
+      </when>
+      <otherwise>
+        SELECT id, order_no AS orderNo, patient_name AS patientName, charge_type AS chargeType,
+               department_name AS departmentName, doctor_name AS doctorName,
+               receivable_amount AS receivableAmount, discount_amount AS discountAmount,
+               paid_amount AS paidAmount, refund_amount AS refundAmount, pay_method AS payMethod,
+               refund_method AS refundMethod, status, cashier, paid_at AS paidAt, refunded_at AS refundedAt
+        FROM clinic_charge_order WHERE deleted = 0
+        <if test="startDate != null">AND DATE(COALESCE(paid_at, created_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(paid_at, created_at)) &lt;= #{endDate}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="department != null and department != '' and department != '全部'">AND department_name = #{department}</if>
+        <if test="cashier != null and cashier != '' and cashier != '全部'">AND cashier = #{cashier}</if>
+        <if test="doctor != null and doctor != '' and doctor != '全部'">AND doctor_name = #{doctor}</if>
+        <if test="orderType != null and orderType != '' and orderType != '全部'">
+          <choose>
+            <when test="orderType == '挂号费'">AND (charge_type LIKE '%挂号%' OR UPPER(charge_type) LIKE '%REGISTRATION%' OR UPPER(charge_type) LIKE '%REGISTER%')</when>
+            <when test="orderType == '药品零售'">AND (charge_type LIKE '%药品零售%' OR UPPER(charge_type) LIKE '%DRUG_RETAIL%' OR UPPER(charge_type) LIKE '%RETAIL%')</when>
+            <when test="orderType == '处方开立'">AND (charge_type LIKE '%处方%' OR charge_type LIKE '%门诊%' OR UPPER(charge_type) LIKE '%PRESCRIPTION%' OR UPPER(charge_type) LIKE '%OUTPATIENT%')</when>
+            <otherwise>AND charge_type = #{orderType}</otherwise>
+          </choose>
+        </if>
+        ORDER BY id DESC
+      </otherwise>
+    </choose>
+  </select>
+  <select id="chargeOrderDetail" resultType="map">
+    SELECT c.id, c.order_no AS orderNo, c.registration_id AS registrationId, c.patient_id AS patientId,
+           c.patient_name AS patientName, c.charge_type AS chargeType, c.department_name AS departmentName,
+           c.doctor_name AS doctorName, c.receivable_amount AS receivableAmount,
+           c.discount_amount AS discountAmount, c.paid_amount AS paidAmount,
+           c.refund_amount AS refundAmount, c.pay_method AS payMethod, c.refund_method AS refundMethod,
+           c.status, c.cashier, c.paid_at AS paidAt, c.refunded_at AS refundedAt,
+           c.remark, c.created_at AS createdAt,
+           p.patient_code AS patientCode, p.age, p.gender, p.phone,
+           COALESCE(m.level_name, p.member_level) AS memberLevel,
+           m.member_type AS memberType, m.card_no AS memberCardNo, m.balance AS memberBalance,
+           m.points AS memberPoints,
+           r.registration_no AS registrationNo, r.visit_time AS visitTime,
+           r.visit_type AS visitType, r.department_name AS registrationDepartment,
+           r.doctor_name AS registrationDoctor, r.registration_fee AS registrationFee,
+           r.diagnosis_fee AS diagnosisFee,
+           co.prescription AS consultationPrescription,
+           co.check_items AS consultationCheckItems
+    FROM clinic_charge_order c
+    LEFT JOIN clinic_patient p ON p.id = c.patient_id AND p.deleted = 0
+    LEFT JOIN clinic_member m ON m.patient_id = c.patient_id AND m.deleted = 0
+    LEFT JOIN clinic_registration r ON r.id = c.registration_id AND r.deleted = 0
+    LEFT JOIN clinic_consultation co ON co.id = (
+      SELECT co2.id
+      FROM clinic_consultation co2
+      WHERE co2.deleted = 0 AND co2.registration_id = c.registration_id
+      ORDER BY co2.id DESC
+      LIMIT 1
+    )
+    WHERE c.id = #{id} AND c.deleted = 0
+  </select>
+  <select id="patientStatistics" resultType="map">
+    <choose>
+      <when test="type == 'age'">
+        SELECT ageRange AS name, COUNT(*) AS value
+        FROM (
+          SELECT CASE
+            WHEN COALESCE(r.age, p.age) IS NULL THEN '未知'
+            WHEN COALESCE(r.age, p.age) &lt;= 10 THEN '0-10岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 20 THEN '11-20岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 30 THEN '21-30岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 40 THEN '31-40岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 50 THEN '41-50岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 60 THEN '51-60岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 70 THEN '61-70岁'
+            WHEN COALESCE(r.age, p.age) &lt;= 80 THEN '71-80岁'
+            ELSE '80岁以上'
+          END AS ageRange
+          FROM clinic_registration r
+          LEFT JOIN clinic_patient p ON p.id = r.patient_id AND p.deleted = 0
+          WHERE r.deleted = 0
+          <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+          <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        ) age_stats
+        GROUP BY ageRange
+        ORDER BY FIELD(ageRange, '0-10岁', '11-20岁', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61-70岁', '71-80岁', '80岁以上', '未知')
+      </when>
+      <when test="type == 'gender'">
+        SELECT COALESCE(r.gender, p.gender, '未知') AS name, COUNT(*) AS value
+        FROM clinic_registration r
+        LEFT JOIN clinic_patient p ON p.id = r.patient_id AND p.deleted = 0
+        WHERE r.deleted = 0
+        <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        GROUP BY COALESCE(r.gender, p.gender, '未知')
+      </when>
+      <when test="type == 'marriage'">
+        SELECT COALESCE(p.marriage,'未知') AS name, COUNT(*) AS value
+        FROM clinic_registration r
+        LEFT JOIN clinic_patient p ON p.id = r.patient_id AND p.deleted = 0
+        WHERE r.deleted = 0
+        <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        GROUP BY COALESCE(p.marriage,'未知')
+      </when>
+      <when test="type == 'member-type' or type == 'member'">
+        SELECT COALESCE(m.member_type, p.member_level, '非会员') AS name, COUNT(*) AS value
+        FROM clinic_patient p
+        LEFT JOIN clinic_member m ON m.patient_id = p.id AND m.deleted = 0
+        WHERE p.deleted = 0
+        GROUP BY COALESCE(m.member_type, p.member_level, '非会员')
+      </when>
+      <when test="type == 'source'">
+        SELECT COALESCE(p.source,'未知') AS name, COUNT(*) AS value
+        FROM clinic_registration r
+        LEFT JOIN clinic_patient p ON p.id = r.patient_id AND p.deleted = 0
+        WHERE r.deleted = 0
+        <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        GROUP BY COALESCE(p.source,'未知')
+      </when>
+      <when test="type == 'visit'">
+        SELECT COALESCE(r.visit_type,'未知') AS name, COUNT(*) AS value
+        FROM clinic_registration r
+        WHERE r.deleted = 0
+        <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        GROUP BY COALESCE(r.visit_type,'未知')
+      </when>
+      <otherwise>
+        SELECT r.id, r.visit_time AS visitTime, r.patient_id AS patientId, r.patient_name AS patientName,
+               r.gender, r.age, r.phone, r.visit_type AS visitType, c.diagnosis,
+               r.department_name AS departmentName, r.doctor_name AS doctorName,
+               COALESCE(co.status, 'PENDING') AS chargeStatus, r.status AS visitStatus
+        FROM clinic_registration r
+        LEFT JOIN clinic_consultation c ON c.registration_id = r.id AND c.deleted = 0
+        LEFT JOIN clinic_charge_order co ON co.id = (
+          SELECT co2.id
+          FROM clinic_charge_order co2
+          WHERE co2.deleted = 0 AND co2.registration_id = r.id
+          ORDER BY co2.id DESC
+          LIMIT 1
+        )
+        WHERE r.deleted = 0
+        <if test="startDate != null">AND DATE(r.visit_time) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(r.visit_time) &lt;= #{endDate}</if>
+        <if test="doctor != null and doctor != '' and doctor != '全部'">AND r.doctor_name = #{doctor}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (r.patient_name LIKE CONCAT('%', #{keyword}, '%') OR r.phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="chargeStatus != null and chargeStatus != '' and chargeStatus != '全部'">
+          <choose>
+            <when test="chargeStatus == '待收费'">AND (co.id IS NULL OR co.status IN ('PENDING', 'PARTIAL'))</when>
+            <when test="chargeStatus == '已收费'">AND co.status = 'PAID'</when>
+            <when test="chargeStatus == '已退费'">AND co.status = 'REFUNDED'</when>
+            <otherwise>AND co.status = #{chargeStatus}</otherwise>
+          </choose>
+        </if>
+        ORDER BY r.visit_time DESC
+      </otherwise>
+    </choose>
+  </select>
+  <select id="drugStatistics" resultType="map">
+    <choose>
+      <when test="type == 'inventory-flow' or type == 'inventory'">
+        SELECT i.drug_id AS drugId, i.drug_code AS drugCode, i.drug_name AS drugName,
+               i.batch_no AS batchNo, i.category, i.specification, i.manufacturer, i.unit,
+               i.quantity AS endQty,
+               CASE WHEN i.quantity = 0 THEN 0 ELSE ROUND(i.purchase_amount / i.quantity, 2) END AS endPrice,
+               i.purchase_amount AS endAmount,
+               0 AS initialQty, 0 AS initialAmount, 0 AS initialPrice,
+               COALESCE(lg.increaseQty, 0) AS increaseQty,
+               CASE WHEN COALESCE(lg.increaseQty, 0) = 0 THEN 0 ELSE ROUND(COALESCE(lg.increaseAmount, 0) / lg.increaseQty, 2) END AS increasePrice,
+               COALESCE(lg.increaseAmount, 0) AS increaseAmount,
+               COALESCE(lg.decreaseQty, 0) AS decreaseQty,
+               CASE WHEN COALESCE(lg.decreaseQty, 0) = 0 THEN 0 ELSE ROUND(COALESCE(lg.decreaseAmount, 0) / lg.decreaseQty, 2) END AS decreasePrice,
+               COALESCE(lg.decreaseAmount, 0) AS decreaseAmount,
+               i.purchase_amount AS purchaseAmount, i.retail_amount AS retailAmount,
+               i.expire_date AS expireDate, COALESCE(lg.lastOperateAt, i.updated_at) AS updatedAt
+        FROM clinic_inventory i
+        LEFT JOIN (
+          SELECT inventory_id,
+                 SUM(CASE WHEN change_quantity &gt; 0 THEN change_quantity ELSE 0 END) AS increaseQty,
+                 SUM(CASE WHEN change_quantity &gt; 0 THEN change_quantity * unit_purchase_price ELSE 0 END) AS increaseAmount,
+                 SUM(CASE WHEN change_quantity &lt; 0 THEN ABS(change_quantity) ELSE 0 END) AS decreaseQty,
+                 SUM(CASE WHEN change_quantity &lt; 0 THEN ABS(change_quantity) * unit_purchase_price ELSE 0 END) AS decreaseAmount,
+                 MAX(created_at) AS lastOperateAt
+          FROM (
+            SELECT l.*, CASE WHEN i2.quantity = 0 THEN 0 ELSE i2.purchase_amount / i2.quantity END AS unit_purchase_price
+            FROM clinic_inventory_log l
+            LEFT JOIN clinic_inventory i2 ON i2.id = l.inventory_id AND i2.deleted = 0
+            WHERE l.deleted = 0
+          ) x
+          GROUP BY inventory_id
+        ) lg ON lg.inventory_id = i.id
+        WHERE i.deleted = 0
+        <if test="startDate != null">AND DATE(COALESCE(lg.lastOperateAt, i.updated_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(lg.lastOperateAt, i.updated_at)) &lt;= #{endDate}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (i.drug_name LIKE CONCAT('%', #{keyword}, '%') OR i.drug_code LIKE CONCAT('%', #{keyword}, '%')
+               OR i.batch_no LIKE CONCAT('%', #{keyword}, '%') OR i.manufacturer LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY COALESCE(lg.lastOperateAt, i.updated_at) DESC, i.id DESC
+      </when>
+      <when test="type == 'price-adjust' or type == 'price'">
+        SELECT p.id, CONCAT('ADJ', LPAD(p.id, 8, '0')) AS orderNo,
+               p.drug_id AS drugId, p.drug_code AS drugCode, p.drug_name AS drugName,
+               i.specification, i.manufacturer, i.batch_no AS batchNo, i.quantity AS stock, i.unit,
+               p.old_purchase_price AS oldPurchasePrice, p.new_purchase_price AS newPurchasePrice,
+               p.old_sell_price AS oldSellPrice, p.new_sell_price AS newSellPrice,
+               p.operator, p.reason, p.created_at AS createdAt
+        FROM clinic_price_adjustment p
+        LEFT JOIN clinic_inventory i ON i.drug_id = p.drug_id AND i.deleted = 0
+        WHERE p.deleted = 0
+        <if test="startDate != null">AND DATE(p.created_at) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(p.created_at) &lt;= #{endDate}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (p.drug_name LIKE CONCAT('%', #{keyword}, '%') OR p.drug_code LIKE CONCAT('%', #{keyword}, '%')
+               OR i.batch_no LIKE CONCAT('%', #{keyword}, '%') OR CONCAT('ADJ', LPAD(p.id, 8, '0')) LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY p.id DESC
+      </when>
+      <when test="type == 'sale'">
+        SELECT co.id, co.order_no AS orderNo, co.charge_type AS chargeType,
+               l.business_type AS orderType, i.drug_id AS drugId, i.drug_code AS drugCode,
+               i.drug_name AS drugName, i.manufacturer, i.specification, i.unit,
+               ABS(l.change_quantity) AS quantity,
+               CASE WHEN i.quantity = 0 THEN 0 ELSE ROUND(i.purchase_amount / i.quantity, 2) END AS purchasePrice,
+               CASE WHEN i.quantity = 0 THEN 0 ELSE ROUND(i.retail_amount / i.quantity, 2) END AS retailPrice,
+               ABS(l.change_quantity) * CASE WHEN i.quantity = 0 THEN 0 ELSE i.purchase_amount / i.quantity END AS purchaseTotal,
+               ABS(l.change_quantity) * CASE WHEN i.quantity = 0 THEN 0 ELSE i.retail_amount / i.quantity END AS retailTotal,
+               co.paid_at AS paidAt, COALESCE(co.paid_at, l.created_at) AS createdAt
+        FROM clinic_inventory_log l
+        LEFT JOIN clinic_inventory i ON i.id = l.inventory_id AND i.deleted = 0
+        LEFT JOIN clinic_charge_order co ON co.order_no = l.business_no AND co.deleted = 0
+        WHERE l.deleted = 0 AND l.business_type = 'SALE'
+        <if test="startDate != null">AND DATE(COALESCE(co.paid_at, l.created_at)) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(COALESCE(co.paid_at, l.created_at)) &lt;= #{endDate}</if>
+        <if test="orderType != null and orderType != ''">
+          AND (co.charge_type LIKE CONCAT('%', #{orderType}, '%') OR co.remark LIKE CONCAT('%', #{orderType}, '%')
+               OR (#{orderType} LIKE '%处方%' AND co.charge_type LIKE '%门诊%')
+               OR (#{orderType} LIKE '%零售%' AND co.remark LIKE '%药%'))
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (co.order_no LIKE CONCAT('%', #{keyword}, '%') OR i.drug_name LIKE CONCAT('%', #{keyword}, '%')
+               OR i.drug_code LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY COALESCE(co.paid_at, l.created_at) DESC, l.id DESC
+      </when>
+      <when test="type == 'prescriptionRank' or type == 'retailRank'">
+        SELECT d.category AS drugCategory, d.drug_code AS drugCode, d.name AS drugName,
+               d.manufacturer, d.specification, i.quantity,
+               i.retail_amount AS amount, i.purchase_amount AS purchaseTotal,
+               i.retail_amount AS retailTotal, (i.retail_amount - i.purchase_amount) AS profit
+        FROM clinic_drug d
+        LEFT JOIN clinic_inventory i ON i.drug_id = d.id AND i.deleted = 0
+        WHERE d.deleted = 0 ORDER BY i.quantity DESC
+      </when>
+      <otherwise>
+        SELECT so.id, so.order_no AS orderNo, so.stock_direction AS stockDirection, so.stock_type AS stockType,
+               so.supplier_name AS supplierName, so.maker, so.operator, so.audit_status AS auditStatus,
+               so.audit_at AS auditAt, so.created_at AS createdAt,
+               i.drug_id AS drugId, i.drug_code AS drugCode, i.drug_name AS drugName,
+               i.specification, i.manufacturer, i.batch_no AS batchNo, i.unit,
+               ABS(COALESCE(l.change_quantity, 0)) AS quantity,
+               CASE WHEN i.quantity = 0 THEN 0 ELSE ROUND(i.purchase_amount / i.quantity, 2) END AS purchasePrice,
+               COALESCE(ABS(l.change_quantity) * CASE WHEN i.quantity = 0 THEN 0 ELSE i.purchase_amount / i.quantity END, so.purchase_amount) AS purchaseAmount,
+               so.retail_amount AS retailAmount
+        FROM clinic_stock_order so
+        LEFT JOIN clinic_inventory_log l ON l.business_no = so.order_no AND l.deleted = 0
+        LEFT JOIN clinic_inventory i ON i.id = l.inventory_id AND i.deleted = 0
+        WHERE so.deleted = 0
+        <if test="type == 'stock-in' or type == 'stockIn'">AND so.stock_direction = 'IN'</if>
+        <if test="type == 'stock-out' or type == 'stockOut'">AND so.stock_direction = 'OUT'</if>
+        <if test="startDate != null">AND DATE(so.created_at) &gt;= #{startDate}</if>
+        <if test="endDate != null">AND DATE(so.created_at) &lt;= #{endDate}</if>
+        <if test="stockInType != null and stockInType != ''">AND so.stock_type = #{stockInType}</if>
+        <if test="stockOutType != null and stockOutType != ''">AND so.stock_type = #{stockOutType}</if>
+        <if test="keyword != null and keyword != ''">
+          AND (so.order_no LIKE CONCAT('%', #{keyword}, '%') OR so.supplier_name LIKE CONCAT('%', #{keyword}, '%')
+               OR so.remark LIKE CONCAT('%', #{keyword}, '%') OR i.drug_name LIKE CONCAT('%', #{keyword}, '%')
+               OR i.drug_code LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY so.id DESC, l.id DESC
+      </otherwise>
+    </choose>
+  </select>
+  <select id="checkProjectStatistics" resultType="map">
+    SELECT id, CONCAT('CHK', DATE_FORMAT(created_at, '%Y%m%d'), LPAD(id, 4, '0')) AS orderNo,
+           project_code AS projectCode, name, category, price, unit, status, created_at AS createdAt
+    FROM clinic_check_project WHERE deleted = 0
+    <if test="startDate != null">AND DATE(created_at) &gt;= #{startDate}</if>
+    <if test="endDate != null">AND DATE(created_at) &lt;= #{endDate}</if>
+    <if test="keyword != null and keyword != ''">
+      AND (project_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%')
+           OR CONCAT('CHK', DATE_FORMAT(created_at, '%Y%m%d'), LPAD(id, 4, '0')) LIKE CONCAT('%', #{keyword}, '%'))
+    </if>
+    ORDER BY id DESC
+  </select>
+</mapper>

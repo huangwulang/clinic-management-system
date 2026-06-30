@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.SupplierMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Supplier">
+    SELECT id, supplier_code, name, contact_name, phone, status, creator, remark, created_at, updated_at, deleted
+    FROM clinic_supplier
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (supplier_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR contact_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_supplier
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (supplier_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR contact_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Supplier">
+    SELECT id, supplier_code, name, contact_name, phone, status, creator, remark, created_at, updated_at, deleted
+    FROM clinic_supplier
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_supplier (supplier_code, name, contact_name, phone, status, creator, remark, created_at, updated_at, deleted)
+    VALUES (#{supplierCode}, #{name}, #{contactName}, #{phone}, #{status}, #{creator}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_supplier
+    <set>
+      <if test="supplierCode != null">supplier_code = #{supplierCode},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="contactName != null">contact_name = #{contactName},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="creator != null">creator = #{creator},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_supplier
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

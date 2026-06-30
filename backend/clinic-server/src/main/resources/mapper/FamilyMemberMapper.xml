@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.FamilyMemberMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.FamilyMember">
+    SELECT id, patient_id, relation, name, gender, age, COALESCE(NULLIF(company, ''), '无') AS company, birthday, phone, created_at, updated_at, deleted
+    FROM clinic_family_member
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR relation LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_family_member
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR relation LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.FamilyMember">
+    SELECT id, patient_id, relation, name, gender, age, COALESCE(NULLIF(company, ''), '无') AS company, birthday, phone, created_at, updated_at, deleted
+    FROM clinic_family_member
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <select id="selectByPatientId" resultType="com.guet.clinic.pojo.entity.FamilyMember">
+    SELECT id, patient_id, relation, name, gender, age, COALESCE(NULLIF(company, ''), '无') AS company, birthday, phone, created_at, updated_at, deleted
+    FROM clinic_family_member
+    WHERE patient_id = #{patientId} AND deleted = 0
+    ORDER BY id DESC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_family_member (patient_id, relation, name, gender, age, company, birthday, phone, created_at, updated_at, deleted)
+    VALUES (#{patientId}, #{relation}, #{name}, #{gender}, #{age}, #{company}, #{birthday}, #{phone}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_family_member
+    <set>
+      <if test="patientId != null">patient_id = #{patientId},</if>
+      <if test="relation != null">relation = #{relation},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="company != null">company = #{company},</if>
+      <if test="birthday != null">birthday = #{birthday},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_family_member
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

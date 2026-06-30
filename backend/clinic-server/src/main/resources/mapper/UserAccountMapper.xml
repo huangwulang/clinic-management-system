@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.UserAccountMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.UserAccount">
+    SELECT u.id, u.username, u.password, u.name, u.phone, u.role_name, r.permissions, u.enabled, u.created_at, u.updated_at, u.deleted
+    FROM sys_user_account u
+    LEFT JOIN sys_role r ON r.deleted = 0 AND (r.role_code = u.role_name OR r.name = u.role_name)
+    WHERE u.deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (u.username LIKE CONCAT('%', #{keyword}, '%') OR u.name LIKE CONCAT('%', #{keyword}, '%') OR u.phone LIKE CONCAT('%', #{keyword}, '%') OR u.role_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY u.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM sys_user_account u
+    WHERE u.deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (u.username LIKE CONCAT('%', #{keyword}, '%') OR u.name LIKE CONCAT('%', #{keyword}, '%') OR u.phone LIKE CONCAT('%', #{keyword}, '%') OR u.role_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.UserAccount">
+    SELECT u.id, u.username, u.password, u.name, u.phone, u.role_name, r.permissions, u.enabled, u.created_at, u.updated_at, u.deleted
+    FROM sys_user_account u
+    LEFT JOIN sys_role r ON r.deleted = 0 AND (r.role_code = u.role_name OR r.name = u.role_name)
+    WHERE u.id = #{id} AND u.deleted = 0
+  </select>
+
+  <select id="selectByUsername" resultType="com.guet.clinic.pojo.entity.UserAccount">
+    SELECT u.id, u.username, u.password, u.name, u.phone, u.role_name, r.permissions, u.enabled, u.created_at, u.updated_at, u.deleted
+    FROM sys_user_account u
+    LEFT JOIN sys_role r ON r.deleted = 0 AND (r.role_code = u.role_name OR r.name = u.role_name)
+    WHERE u.username = #{username} AND u.deleted = 0
+    LIMIT 1
+  </select>
+
+  <select id="selectByPhone" resultType="com.guet.clinic.pojo.entity.UserAccount">
+    SELECT u.id, u.username, u.password, u.name, u.phone, u.role_name, r.permissions, u.enabled, u.created_at, u.updated_at, u.deleted
+    FROM sys_user_account u
+    LEFT JOIN sys_role r ON r.deleted = 0 AND (r.role_code = u.role_name OR r.name = u.role_name)
+    WHERE u.phone = #{phone} AND u.deleted = 0 LIMIT 1
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO sys_user_account (username, password, name, phone, role_name, enabled, created_at, updated_at, deleted)
+    VALUES (#{username}, #{password}, #{name}, #{phone}, #{roleName}, #{enabled}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE sys_user_account
+    <set>
+      <if test="username != null">username = #{username},</if>
+      <if test="password != null">password = #{password},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="roleName != null">role_name = #{roleName},</if>
+      <if test="enabled != null">enabled = #{enabled},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE sys_user_account
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

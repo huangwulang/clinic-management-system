@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.MedicalTemplateMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.MedicalTemplate">
+    SELECT id, template_code, template_type, name, permission, diagnosis, description, content, creator, status, created_at, updated_at, deleted
+    FROM clinic_medical_template
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (template_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR template_type LIKE CONCAT('%', #{keyword}, '%') OR diagnosis LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_medical_template
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (template_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR template_type LIKE CONCAT('%', #{keyword}, '%') OR diagnosis LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.MedicalTemplate">
+    SELECT id, template_code, template_type, name, permission, diagnosis, description, content, creator, status, created_at, updated_at, deleted
+    FROM clinic_medical_template
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_medical_template (template_code, template_type, name, permission, diagnosis, description, content, creator, status, created_at, updated_at, deleted)
+    VALUES (#{templateCode}, #{templateType}, #{name}, #{permission}, #{diagnosis}, #{description}, #{content}, #{creator}, #{status}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_medical_template
+    <set>
+      <if test="templateCode != null">template_code = #{templateCode},</if>
+      <if test="templateType != null">template_type = #{templateType},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="permission != null">permission = #{permission},</if>
+      <if test="diagnosis != null">diagnosis = #{diagnosis},</if>
+      <if test="description != null">description = #{description},</if>
+      <if test="content != null">content = #{content},</if>
+      <if test="creator != null">creator = #{creator},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_medical_template
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.InventoryCheckItemMapper">
+  <sql id="columns">
+    id, check_id, inventory_id, drug_id, drug_code, drug_name, location_no,
+    prescription_category, specification, manufacturer, system_quantity,
+    check_quantity, difference_quantity, unit, remark, created_at, updated_at, deleted
+  </sql>
+
+  <select id="selectByCheckId" resultType="com.guet.clinic.pojo.entity.InventoryCheckItem">
+    SELECT <include refid="columns" />
+    FROM clinic_inventory_check_item
+    WHERE check_id = #{checkId} AND deleted = 0
+    ORDER BY id ASC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_inventory_check_item
+      (check_id, inventory_id, drug_id, drug_code, drug_name, location_no,
+       prescription_category, specification, manufacturer, system_quantity,
+       check_quantity, difference_quantity, unit, remark, created_at, updated_at, deleted)
+    VALUES
+      (#{checkId}, #{inventoryId}, #{drugId}, #{drugCode}, #{drugName}, #{locationNo},
+       #{prescriptionCategory}, #{specification}, #{manufacturer}, #{systemQuantity},
+       #{checkQuantity}, #{differenceQuantity}, #{unit}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="deleteByCheckId">
+    UPDATE clinic_inventory_check_item
+    SET deleted = 1, updated_at = NOW()
+    WHERE check_id = #{checkId} AND deleted = 0
+  </update>
+</mapper>

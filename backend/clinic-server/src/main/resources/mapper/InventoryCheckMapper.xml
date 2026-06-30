@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.InventoryCheckMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.InventoryCheck">
+    SELECT id, check_no, check_date, maker, check_status, remark, created_at, updated_at, deleted
+    FROM clinic_inventory_check
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (check_no LIKE CONCAT('%', #{keyword}, '%') OR maker LIKE CONCAT('%', #{keyword}, '%') OR check_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_inventory_check
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (check_no LIKE CONCAT('%', #{keyword}, '%') OR maker LIKE CONCAT('%', #{keyword}, '%') OR check_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.InventoryCheck">
+    SELECT id, check_no, check_date, maker, check_status, remark, created_at, updated_at, deleted
+    FROM clinic_inventory_check
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_inventory_check (check_no, check_date, maker, check_status, remark, created_at, updated_at, deleted)
+    VALUES (#{checkNo}, #{checkDate}, #{maker}, #{checkStatus}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_inventory_check
+    <set>
+      <if test="checkNo != null">check_no = #{checkNo},</if>
+      <if test="checkDate != null">check_date = #{checkDate},</if>
+      <if test="maker != null">maker = #{maker},</if>
+      <if test="checkStatus != null">check_status = #{checkStatus},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_inventory_check
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.PriceAdjustmentMapper">
+  <sql id="prescriptionCategory">
+    CASE
+      WHEN COALESCE(d.category, '') LIKE '%中药%'
+        OR COALESCE(d.category, '') LIKE '%中成药%'
+        OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+      THEN '中药'
+      ELSE '西/成药'
+    END
+  </sql>
+
+  <sql id="drugFilters">
+    d.deleted = 0
+    <if test="keyword != null and keyword != ''">
+      AND (
+        d.drug_code LIKE CONCAT('%', #{keyword}, '%')
+        OR d.name LIKE CONCAT('%', #{keyword}, '%')
+        OR d.pinyin LIKE CONCAT('%', #{keyword}, '%')
+        OR COALESCE(d.manufacturer, '') LIKE CONCAT('%', #{keyword}, '%')
+      )
+    </if>
+    <if test="category != null and category != ''">
+      AND (
+        CASE
+          WHEN COALESCE(d.category, '') LIKE '%中药%'
+            OR COALESCE(d.category, '') LIKE '%中成药%'
+            OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+          THEN '中药'
+          ELSE '西/成药'
+        END
+      ) = #{category}
+    </if>
+  </sql>
+
+  <select id="selectAdjustableDrugs" resultType="com.guet.clinic.pojo.vo.PriceAdjustmentVO">
+    SELECT
+      d.id,
+      d.id AS drug_id,
+      d.drug_code,
+      d.name AS drug_name,
+      d.purchase_price AS old_purchase_price,
+      d.purchase_price AS new_purchase_price,
+      d.sell_price AS old_sell_price,
+      d.sell_price AS new_sell_price,
+      d.specification,
+      d.dosage_form,
+      d.manufacturer,
+      <include refid="prescriptionCategory"/> AS prescription_category,
+      d.created_at,
+      d.updated_at,
+      d.deleted
+    FROM clinic_drug d
+    WHERE <include refid="drugFilters"/>
+    ORDER BY d.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countAdjustableDrugs" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_drug d
+    WHERE <include refid="drugFilters"/>
+  </select>
+
+  <select id="selectRecordSummaries" resultType="com.guet.clinic.pojo.vo.PriceAdjustmentVO">
+    SELECT
+      d.id,
+      d.id AS drug_id,
+      d.drug_code,
+      d.name AS drug_name,
+      d.purchase_price AS new_purchase_price,
+      d.sell_price AS new_sell_price,
+      d.specification,
+      d.dosage_form,
+      d.manufacturer,
+      <include refid="prescriptionCategory"/> AS prescription_category,
+      COUNT(p.id) AS adjustment_count,
+      MAX(p.created_at) AS created_at,
+      MAX(p.updated_at) AS updated_at,
+      0 AS deleted
+    FROM clinic_price_adjustment p
+    INNER JOIN clinic_drug d ON d.id = p.drug_id
+    WHERE p.deleted = 0
+      AND <include refid="drugFilters"/>
+    GROUP BY
+      d.id, d.drug_code, d.name, d.purchase_price, d.sell_price,
+      d.specification, d.dosage_form, d.manufacturer, d.category, d.approval_no
+    ORDER BY MAX(p.created_at) DESC, d.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countRecordSummaries" resultType="long">
+    SELECT COUNT(DISTINCT p.drug_id)
+    FROM clinic_price_adjustment p
+    INNER JOIN clinic_drug d ON d.id = p.drug_id
+    WHERE p.deleted = 0
+      AND <include refid="drugFilters"/>
+  </select>
+
+  <select id="selectFormRows" resultType="com.guet.clinic.pojo.vo.PriceAdjustmentVO">
+    SELECT
+      d.id,
+      d.id AS drug_id,
+      d.drug_code,
+      d.name AS drug_name,
+      d.purchase_price AS old_purchase_price,
+      d.purchase_price AS new_purchase_price,
+      d.sell_price AS old_sell_price,
+      d.sell_price AS new_sell_price,
+      d.specification,
+      d.dosage_form,
+      d.manufacturer,
+      <include refid="prescriptionCategory"/> AS prescription_category,
+      i.id AS inventory_id,
+      i.batch_no,
+      COALESCE(i.quantity, 0) AS quantity,
+      COALESCE(i.unit, d.unit) AS unit,
+      i.purchase_amount,
+      i.retail_amount,
+      d.created_at,
+      d.updated_at,
+      d.deleted
+    FROM clinic_drug d
+    LEFT JOIN clinic_inventory i
+      ON i.drug_id = d.id AND i.deleted = 0
+    WHERE d.id = #{drugId} AND d.deleted = 0
+    ORDER BY i.id ASC
+  </select>
+
+  <select id="selectHistoryByDrugId" resultType="com.guet.clinic.pojo.vo.PriceAdjustmentVO">
+    SELECT
+      p.id,
+      p.drug_id,
+      p.drug_code,
+      p.drug_name,
+      p.old_purchase_price,
+      p.new_purchase_price,
+      p.old_sell_price,
+      p.new_sell_price,
+      p.operator,
+      p.reason,
+      d.specification,
+      d.dosage_form,
+      d.manufacturer,
+      <include refid="prescriptionCategory"/> AS prescription_category,
+      inventory.inventory_id,
+      inventory.batch_no,
+      COALESCE(inventory.quantity, 0) AS quantity,
+      COALESCE(inventory.unit, d.unit) AS unit,
+      inventory.purchase_amount,
+      inventory.retail_amount,
+      p.created_at,
+      p.updated_at,
+      p.deleted
+    FROM clinic_price_adjustment p
+    INNER JOIN clinic_drug d ON d.id = p.drug_id
+    LEFT JOIN (
+      SELECT
+        drug_id,
+        MAX(id) AS inventory_id,
+        MAX(batch_no) AS batch_no,
+        SUM(COALESCE(quantity, 0)) AS quantity,
+        MAX(unit) AS unit,
+        SUM(COALESCE(purchase_amount, 0)) AS purchase_amount,
+        SUM(COALESCE(retail_amount, 0)) AS retail_amount
+      FROM clinic_inventory
+      WHERE deleted = 0
+      GROUP BY drug_id
+    ) inventory ON inventory.drug_id = d.id
+    WHERE p.drug_id = #{drugId} AND p.deleted = 0
+    ORDER BY p.created_at DESC, p.id DESC
+  </select>
+
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.PriceAdjustment">
+    SELECT id, drug_id, drug_code, drug_name, old_purchase_price, new_purchase_price,
+      old_sell_price, new_sell_price, operator, reason, created_at, updated_at, deleted
+    FROM clinic_price_adjustment
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (
+          drug_code LIKE CONCAT('%', #{keyword}, '%')
+          OR drug_name LIKE CONCAT('%', #{keyword}, '%')
+          OR operator LIKE CONCAT('%', #{keyword}, '%')
+        )
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_price_adjustment
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (
+          drug_code LIKE CONCAT('%', #{keyword}, '%')
+          OR drug_name LIKE CONCAT('%', #{keyword}, '%')
+          OR operator LIKE CONCAT('%', #{keyword}, '%')
+        )
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.PriceAdjustment">
+    SELECT id, drug_id, drug_code, drug_name, old_purchase_price, new_purchase_price,
+      old_sell_price, new_sell_price, operator, reason, created_at, updated_at, deleted
+    FROM clinic_price_adjustment
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_price_adjustment (
+      drug_id, drug_code, drug_name, old_purchase_price, new_purchase_price,
+      old_sell_price, new_sell_price, operator, reason, created_at, updated_at, deleted
+    )
+    VALUES (
+      #{drugId}, #{drugCode}, #{drugName}, #{oldPurchasePrice}, #{newPurchasePrice},
+      #{oldSellPrice}, #{newSellPrice}, #{operator}, #{reason},
+      #{createdAt}, #{updatedAt}, #{deleted}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_price_adjustment
+    <set>
+      <if test="drugId != null">drug_id = #{drugId},</if>
+      <if test="drugCode != null">drug_code = #{drugCode},</if>
+      <if test="drugName != null">drug_name = #{drugName},</if>
+      <if test="oldPurchasePrice != null">old_purchase_price = #{oldPurchasePrice},</if>
+      <if test="newPurchasePrice != null">new_purchase_price = #{newPurchasePrice},</if>
+      <if test="oldSellPrice != null">old_sell_price = #{oldSellPrice},</if>
+      <if test="newSellPrice != null">new_sell_price = #{newSellPrice},</if>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="reason != null">reason = #{reason},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="updateDrugPrices">
+    UPDATE clinic_drug
+    SET purchase_price = #{purchasePrice},
+        sell_price = #{sellPrice},
+        updated_at = #{updatedAt}
+    WHERE id = #{drugId} AND deleted = 0
+  </update>
+
+  <update id="updateInventoryAmounts">
+    UPDATE clinic_inventory
+    SET purchase_amount = COALESCE(quantity, 0) * #{purchasePrice},
+        retail_amount = COALESCE(quantity, 0) * #{sellPrice},
+        updated_at = #{updatedAt}
+    WHERE drug_id = #{drugId} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_price_adjustment
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

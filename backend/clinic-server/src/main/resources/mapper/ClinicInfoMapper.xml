@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.ClinicInfoMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.ClinicInfo">
+    SELECT id, clinic_code, clinic_name, principal, phone, email, region, address, license_no, introduction, created_at, updated_at, deleted
+    FROM clinic_info
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (clinic_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR principal LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_info
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (clinic_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR principal LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.ClinicInfo">
+    SELECT id, clinic_code, clinic_name, principal, phone, email, region, address, license_no, introduction, created_at, updated_at, deleted
+    FROM clinic_info
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_info (clinic_code, clinic_name, principal, phone, email, region, address, license_no, introduction, created_at, updated_at, deleted)
+    VALUES (#{clinicCode}, #{clinicName}, #{principal}, #{phone}, #{email}, #{region}, #{address}, #{licenseNo}, #{introduction}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_info
+    <set>
+      <if test="clinicCode != null">clinic_code = #{clinicCode},</if>
+      <if test="clinicName != null">clinic_name = #{clinicName},</if>
+      <if test="principal != null">principal = #{principal},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="email != null">email = #{email},</if>
+      <if test="region != null">region = #{region},</if>
+      <if test="address != null">address = #{address},</if>
+      <if test="licenseNo != null">license_no = #{licenseNo},</if>
+      <if test="introduction != null">introduction = #{introduction},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_info
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

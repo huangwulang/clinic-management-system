@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.MemberTransactionMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.MemberTransaction">
+    SELECT id, member_id, transaction_type, amount, points, balance_after, points_after, business_no, remark, operator, created_at, updated_at, deleted FROM clinic_member_transaction WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (transaction_type LIKE CONCAT('%', #{keyword}, '%') OR business_no LIKE CONCAT('%', #{keyword}, '%') OR operator LIKE CONCAT('%', #{keyword}, '%'))</if>
+    ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="count" resultType="long">
+    SELECT COUNT(1) FROM clinic_member_transaction WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (transaction_type LIKE CONCAT('%', #{keyword}, '%') OR business_no LIKE CONCAT('%', #{keyword}, '%') OR operator LIKE CONCAT('%', #{keyword}, '%'))</if>
+  </select>
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.MemberTransaction">
+    SELECT id, member_id, transaction_type, amount, points, balance_after, points_after, business_no, remark, operator, created_at, updated_at, deleted FROM clinic_member_transaction WHERE id = #{id} AND deleted = 0
+  </select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_member_transaction (member_id, transaction_type, amount, points, balance_after, points_after, business_no, remark, operator, created_at, updated_at, deleted)
+    VALUES (#{memberId}, #{transactionType}, #{amount}, #{points}, #{balanceAfter}, #{pointsAfter}, #{businessNo}, #{remark}, #{operator}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+  <update id="update">
+    UPDATE clinic_member_transaction<set>
+      <if test="memberId != null">member_id = #{memberId},</if>
+      <if test="transactionType != null">transaction_type = #{transactionType},</if>
+      <if test="amount != null">amount = #{amount},</if>
+      <if test="points != null">points = #{points},</if>
+      <if test="balanceAfter != null">balance_after = #{balanceAfter},</if>
+      <if test="pointsAfter != null">points_after = #{pointsAfter},</if>
+      <if test="businessNo != null">business_no = #{businessNo},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+    </set>WHERE id = #{id} AND deleted = 0
+  </update>
+  <update id="softDelete">UPDATE clinic_member_transaction SET deleted = 1, updated_at = NOW() WHERE id = #{id}</update>
+  <select id="selectByMember" resultType="com.guet.clinic.pojo.entity.MemberTransaction">
+    SELECT id, member_id, transaction_type, amount, points, balance_after, points_after, business_no, remark, operator, created_at, updated_at, deleted
+    FROM clinic_member_transaction WHERE member_id = #{memberId} AND deleted = 0
+    <choose>
+      <when test="transactionType == 'BALANCE'">AND amount IS NOT NULL</when>
+      <when test="transactionType == 'POINTS'">AND points IS NOT NULL</when>
+      <when test="transactionType == 'LEVEL'">AND transaction_type = 'LEVEL_CHANGE'</when>
+    </choose>
+    ORDER BY id DESC
+  </select>
+</mapper>

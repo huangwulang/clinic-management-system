@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.RegistrationMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Registration">
+    SELECT r.id, r.registration_no, r.patient_id, r.patient_name, r.phone, r.gender, r.age,
+           r.department_name, r.doctor_id, r.doctor_name, r.visit_type, r.visit_time, r.status,
+           r.registration_fee, r.diagnosis_fee, r.operator, r.remark, r.created_at, r.updated_at,
+           r.deleted, c.order_no AS charge_order_no, c.receivable_amount, c.discount_amount,
+           c.paid_amount, c.pay_method, c.paid_at, c.cashier
+    FROM clinic_registration r
+    LEFT JOIN clinic_charge_order c ON c.id = (
+      SELECT c2.id
+      FROM clinic_charge_order c2
+      WHERE c2.deleted = 0
+        AND c2.registration_id = r.id
+      ORDER BY c2.id DESC
+      LIMIT 1
+    )
+    WHERE r.deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (r.registration_no LIKE CONCAT('%', #{keyword}, '%') OR r.patient_name LIKE CONCAT('%', #{keyword}, '%') OR r.phone LIKE CONCAT('%', #{keyword}, '%') OR r.department_name LIKE CONCAT('%', #{keyword}, '%') OR r.doctor_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY r.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_registration
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (registration_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR department_name LIKE CONCAT('%', #{keyword}, '%') OR doctor_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Registration">
+    SELECT r.id, r.registration_no, r.patient_id, r.patient_name, r.phone, r.gender, r.age,
+           r.department_name, r.doctor_id, r.doctor_name, r.visit_type, r.visit_time, r.status,
+           r.registration_fee, r.diagnosis_fee, r.operator, r.remark, r.created_at, r.updated_at,
+           r.deleted, c.order_no AS charge_order_no, c.receivable_amount, c.discount_amount,
+           c.paid_amount, c.pay_method, c.paid_at, c.cashier
+    FROM clinic_registration r
+    LEFT JOIN clinic_charge_order c ON c.id = (
+      SELECT c2.id
+      FROM clinic_charge_order c2
+      WHERE c2.deleted = 0
+        AND c2.registration_id = r.id
+      ORDER BY c2.id DESC
+      LIMIT 1
+    )
+    WHERE r.id = #{id} AND r.deleted = 0
+  </select>
+
+  <select id="selectByRegistrationNo" resultType="com.guet.clinic.pojo.entity.Registration">
+    SELECT id, registration_no, patient_id, patient_name, phone, gender, age, department_name, doctor_id, doctor_name, visit_type, visit_time, status, registration_fee, diagnosis_fee, operator, remark, created_at, updated_at, deleted
+    FROM clinic_registration
+    WHERE registration_no = #{registrationNo} AND deleted = 0
+    LIMIT 1
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_registration (registration_no, patient_id, patient_name, phone, gender, age, department_name, doctor_id, doctor_name, visit_type, visit_time, status, registration_fee, diagnosis_fee, operator, remark, created_at, updated_at, deleted)
+    VALUES (#{registrationNo}, #{patientId}, #{patientName}, #{phone}, #{gender}, #{age}, #{departmentName}, #{doctorId}, #{doctorName}, #{visitType}, #{visitTime}, #{status}, #{registrationFee}, #{diagnosisFee}, #{operator}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_registration
+    <set>
+      <if test="registrationNo != null">registration_no = #{registrationNo},</if>
+      <if test="patientId != null">patient_id = #{patientId},</if>
+      <if test="patientName != null">patient_name = #{patientName},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="departmentName != null">department_name = #{departmentName},</if>
+      <if test="doctorId != null">doctor_id = #{doctorId},</if>
+      <if test="doctorName != null">doctor_name = #{doctorName},</if>
+      <if test="visitType != null">visit_type = #{visitType},</if>
+      <if test="visitTime != null">visit_time = #{visitTime},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="registrationFee != null">registration_fee = #{registrationFee},</if>
+      <if test="diagnosisFee != null">diagnosis_fee = #{diagnosisFee},</if>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_registration
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

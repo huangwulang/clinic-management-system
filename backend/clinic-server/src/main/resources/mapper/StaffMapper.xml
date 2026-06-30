@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.StaffMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Staff">
+    SELECT id, job_no, name, gender, age, phone, email, id_card, position_name, clinic_name, department_name, role_name, address, creator, enabled, created_at, updated_at, deleted
+    FROM sys_staff
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (job_no LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR department_name LIKE CONCAT('%', #{keyword}, '%') OR role_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM sys_staff
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (job_no LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR department_name LIKE CONCAT('%', #{keyword}, '%') OR role_name LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Staff">
+    SELECT id, job_no, name, gender, age, phone, email, id_card, position_name, clinic_name, department_name, role_name, address, creator, enabled, created_at, updated_at, deleted
+    FROM sys_staff
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO sys_staff (job_no, name, gender, age, phone, email, id_card, position_name, clinic_name, department_name, role_name, address, creator, enabled, created_at, updated_at, deleted)
+    VALUES (#{jobNo}, #{name}, #{gender}, #{age}, #{phone}, #{email}, #{idCard}, #{positionName}, #{clinicName}, #{departmentName}, #{roleName}, #{address}, #{creator}, #{enabled}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE sys_staff
+    <set>
+      <if test="jobNo != null">job_no = #{jobNo},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="email != null">email = #{email},</if>
+      <if test="idCard != null">id_card = #{idCard},</if>
+      <if test="positionName != null">position_name = #{positionName},</if>
+      <if test="clinicName != null">clinic_name = #{clinicName},</if>
+      <if test="departmentName != null">department_name = #{departmentName},</if>
+      <if test="roleName != null">role_name = #{roleName},</if>
+      <if test="address != null">address = #{address},</if>
+      <if test="creator != null">creator = #{creator},</if>
+      <if test="enabled != null">enabled = #{enabled},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE sys_staff
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.ConsultationMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Consultation">
+    SELECT id, registration_id, patient_id, patient_name, doctor_name, department_name, visit_type, chief_complaint, diagnosis, doctor_advice, vital_signs, medical_record, prescription, check_items, status, created_at, updated_at, deleted
+    FROM clinic_consultation
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (patient_name LIKE CONCAT('%', #{keyword}, '%') OR doctor_name LIKE CONCAT('%', #{keyword}, '%') OR diagnosis LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_consultation
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (patient_name LIKE CONCAT('%', #{keyword}, '%') OR doctor_name LIKE CONCAT('%', #{keyword}, '%') OR diagnosis LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Consultation">
+    SELECT id, registration_id, patient_id, patient_name, doctor_name, department_name, visit_type, chief_complaint, diagnosis, doctor_advice, vital_signs, medical_record, prescription, check_items, status, created_at, updated_at, deleted
+    FROM clinic_consultation
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <select id="selectByPatientId" resultType="com.guet.clinic.pojo.entity.Consultation">
+    SELECT id, registration_id, patient_id, patient_name, doctor_name, department_name, visit_type, chief_complaint, diagnosis, doctor_advice, vital_signs, medical_record, prescription, check_items, status, created_at, updated_at, deleted
+    FROM clinic_consultation
+    WHERE patient_id = #{patientId} AND deleted = 0
+    ORDER BY created_at DESC, id DESC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_consultation (registration_id, patient_id, patient_name, doctor_name, department_name, visit_type, chief_complaint, diagnosis, doctor_advice, vital_signs, medical_record, prescription, check_items, status, created_at, updated_at, deleted)
+    VALUES (#{registrationId}, #{patientId}, #{patientName}, #{doctorName}, #{departmentName}, #{visitType}, #{chiefComplaint}, #{diagnosis}, #{doctorAdvice}, #{vitalSigns}, #{medicalRecord}, #{prescription}, #{checkItems}, #{status}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_consultation
+    <set>
+      <if test="registrationId != null">registration_id = #{registrationId},</if>
+      <if test="patientId != null">patient_id = #{patientId},</if>
+      <if test="patientName != null">patient_name = #{patientName},</if>
+      <if test="doctorName != null">doctor_name = #{doctorName},</if>
+      <if test="departmentName != null">department_name = #{departmentName},</if>
+      <if test="visitType != null">visit_type = #{visitType},</if>
+      <if test="chiefComplaint != null">chief_complaint = #{chiefComplaint},</if>
+      <if test="diagnosis != null">diagnosis = #{diagnosis},</if>
+      <if test="doctorAdvice != null">doctor_advice = #{doctorAdvice},</if>
+      <if test="vitalSigns != null">vital_signs = #{vitalSigns},</if>
+      <if test="medicalRecord != null">medical_record = #{medicalRecord},</if>
+      <if test="prescription != null">prescription = #{prescription},</if>
+      <if test="checkItems != null">check_items = #{checkItems},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_consultation
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

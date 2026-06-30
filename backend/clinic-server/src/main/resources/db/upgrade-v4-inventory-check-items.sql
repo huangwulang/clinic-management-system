@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS clinic_inventory_check_item (
+  id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键编号',
+  check_id BIGINT NOT NULL COMMENT '盘点单编号',
+  inventory_id BIGINT NOT NULL COMMENT '库存编号',
+  drug_id BIGINT DEFAULT NULL COMMENT '药品编号',
+  drug_code VARCHAR(40) DEFAULT NULL COMMENT '药品编码',
+  drug_name VARCHAR(150) DEFAULT NULL COMMENT '药品名称',
+  location_no VARCHAR(60) DEFAULT NULL COMMENT '货位号',
+  prescription_category VARCHAR(50) DEFAULT NULL COMMENT '处方类别',
+  specification VARCHAR(100) DEFAULT NULL COMMENT '规格',
+  manufacturer VARCHAR(200) DEFAULT NULL COMMENT '生产厂家',
+  system_quantity INT DEFAULT NULL COMMENT '账面库存',
+  check_quantity INT DEFAULT NULL COMMENT '实盘库存',
+  difference_quantity INT DEFAULT NULL COMMENT '盘盈盘亏数量',
+  unit VARCHAR(30) DEFAULT NULL COMMENT '计量单位',
+  remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  deleted TINYINT(1) DEFAULT 0 COMMENT '逻辑删除标志',
+  created_at DATETIME NOT NULL COMMENT '创建时间',
+  updated_at DATETIME NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (id),
+  KEY idx_inventory_check_item_check_id (check_id),
+  KEY idx_inventory_check_item_inventory_id (inventory_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='库存盘点明细表';

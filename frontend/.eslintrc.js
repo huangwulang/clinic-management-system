@@ -1,0 +1,38 @@
+module.exports = {
+  root: true,
+  env: {
+    browser: true,
+    node: true,
+  },
+  parser: 'vue-eslint-parser',
+  parserOptions: {
+    parser: '@typescript-eslint/parser',
+    ecmaVersion: 2020,
+    sourceType: 'module',
+  },
+  extends: [
+    'airbnb-base',
+    'plugin:vue/recommended',
+    'plugin:@typescript-eslint/recommended',
+  ],
+  plugins: ['vue', '@typescript-eslint'],
+  rules: {
+    'no-console': 'off',
+    '@typescript-eslint/no-unused-vars': ['warn'],
+    '@typescript-eslint/no-empty-object-type': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
+    'import/no-unresolved': 'off',
+    'import/extensions': 'off',
+    'import/order': 'off',
+    'import/no-extraneous-dependencies': 'off',
+    'no-restricted-syntax': 'off',
+    'no-mixed-operators': 'off',
+    'no-param-reassign': 'off',
+    'default-case': 'off',
+    'no-plusplus': 'off',
+    'no-multi-assign': 'off',
+    'max-len': 'off',
+    'vue/no-v-model-argument': 'off',
+  },
+  ignorePatterns: ['dist', 'node_modules'],
+};

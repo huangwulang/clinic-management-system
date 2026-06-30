@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.InventoryMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Inventory">
+    SELECT id, drug_id, drug_code, drug_name, location_no, batch_no, category, specification, dosage_form, manufacturer, quantity, unit, purchase_amount, retail_amount, expire_date, warning_stock, created_at, updated_at, deleted
+    FROM clinic_inventory
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (drug_code LIKE CONCAT('%', #{keyword}, '%') OR drug_name LIKE CONCAT('%', #{keyword}, '%') OR manufacturer LIKE CONCAT('%', #{keyword}, '%') OR batch_no LIKE CONCAT('%', #{keyword}, '%') OR location_no LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_inventory
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (drug_code LIKE CONCAT('%', #{keyword}, '%') OR drug_name LIKE CONCAT('%', #{keyword}, '%') OR manufacturer LIKE CONCAT('%', #{keyword}, '%') OR batch_no LIKE CONCAT('%', #{keyword}, '%') OR location_no LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <sql id="inventoryFilterConditions">
+    <if test="keyword != null and keyword != ''">
+      AND (i.drug_code LIKE CONCAT('%', #{keyword}, '%')
+        OR i.drug_name LIKE CONCAT('%', #{keyword}, '%')
+        OR i.manufacturer LIKE CONCAT('%', #{keyword}, '%')
+        OR i.batch_no LIKE CONCAT('%', #{keyword}, '%')
+        OR i.location_no LIKE CONCAT('%', #{keyword}, '%'))
+    </if>
+    <if test="category != null and category != ''">
+      <choose>
+        <when test="category == '西/成药'">
+          AND NOT (
+            COALESCE(d.category, i.category, '') LIKE '%中药%'
+            OR COALESCE(d.category, i.category, '') LIKE '%中成药%'
+            OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+          )
+        </when>
+        <when test="category == '中药'">
+          AND (
+            COALESCE(d.category, i.category, '') LIKE '%中药%'
+            OR COALESCE(d.category, i.category, '') LIKE '%中成药%'
+            OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+          )
+        </when>
+      </choose>
+    </if>
+  </sql>
+
+  <select id="selectPageByFilters" resultType="com.guet.clinic.pojo.entity.Inventory">
+    SELECT i.id, i.drug_id, i.drug_code, i.drug_name, i.location_no, i.batch_no, i.category,
+           CASE WHEN (
+             COALESCE(d.category, i.category, '') LIKE '%中药%'
+             OR COALESCE(d.category, i.category, '') LIKE '%中成药%'
+             OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+           ) THEN '中药' ELSE '西/成药' END AS prescription_category,
+           i.specification, i.dosage_form, i.manufacturer, i.quantity, i.unit,
+           i.purchase_amount, i.retail_amount, i.expire_date, i.warning_stock,
+           i.created_at, i.updated_at, i.deleted
+    FROM clinic_inventory i
+    LEFT JOIN clinic_drug d ON d.id = i.drug_id AND d.deleted = 0
+    WHERE i.deleted = 0
+    <include refid="inventoryFilterConditions" />
+    ORDER BY i.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countByFilters" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_inventory i
+    LEFT JOIN clinic_drug d ON d.id = i.drug_id AND d.deleted = 0
+    WHERE i.deleted = 0
+    <include refid="inventoryFilterConditions" />
+  </select>
+
+  <select id="selectSummary" resultType="java.util.HashMap">
+    SELECT
+      COALESCE(SUM(purchase_amount), 0) AS purchaseAmount,
+      COALESCE(SUM(retail_amount), 0) AS retailAmount
+    FROM clinic_inventory
+    WHERE deleted = 0
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Inventory">
+    SELECT i.id, i.drug_id, i.drug_code, i.drug_name, i.location_no, i.batch_no, i.category,
+           CASE WHEN (
+             COALESCE(d.category, i.category, '') LIKE '%中药%'
+             OR COALESCE(d.category, i.category, '') LIKE '%中成药%'
+             OR COALESCE(d.approval_no, '') LIKE '国药准字Z%'
+           ) THEN '中药' ELSE '西/成药' END AS prescription_category,
+           i.specification, i.dosage_form, i.manufacturer, i.quantity, i.unit,
+           i.purchase_amount, i.retail_amount, i.expire_date, i.warning_stock,
+           i.created_at, i.updated_at, i.deleted
+    FROM clinic_inventory i
+    LEFT JOIN clinic_drug d ON d.id = i.drug_id AND d.deleted = 0
+    WHERE i.id = #{id} AND i.deleted = 0
+  </select>
+
+  <select id="selectAvailableByDrugId" resultType="com.guet.clinic.pojo.entity.Inventory">
+    SELECT i.id, i.drug_id, i.drug_code, i.drug_name, i.location_no, i.batch_no, i.category,
+           i.specification, i.dosage_form, i.manufacturer, i.quantity, i.unit,
+           i.purchase_amount, i.retail_amount, i.expire_date, i.warning_stock,
+           i.created_at, i.updated_at, i.deleted
+    FROM clinic_inventory i
+    LEFT JOIN clinic_drug d ON d.id = #{drugId} AND d.deleted = 0
+    WHERE i.deleted = 0
+      AND (
+        i.drug_id = #{drugId}
+        OR ((i.drug_id IS NULL OR i.drug_id = 0) AND d.drug_code IS NOT NULL AND i.drug_code = d.drug_code)
+      )
+    ORDER BY
+      CASE WHEN expire_date IS NULL THEN 1 ELSE 0 END,
+      expire_date ASC,
+      id ASC
+  </select>
+
+  <select id="selectAvailableByDrugCode" resultType="com.guet.clinic.pojo.entity.Inventory">
+    SELECT i.id, i.drug_id, i.drug_code, i.drug_name, i.location_no, i.batch_no, i.category,
+           i.specification, i.dosage_form, i.manufacturer, i.quantity, i.unit,
+           i.purchase_amount, i.retail_amount, i.expire_date, i.warning_stock,
+           i.created_at, i.updated_at, i.deleted
+    FROM clinic_inventory i
+    LEFT JOIN clinic_drug d ON d.drug_code = #{drugCode} AND d.deleted = 0
+    WHERE i.deleted = 0
+      AND (
+        i.drug_code = #{drugCode}
+        OR (d.id IS NOT NULL AND i.drug_id = d.id)
+      )
+    ORDER BY
+      CASE WHEN i.expire_date IS NULL THEN 1 ELSE 0 END,
+      i.expire_date ASC,
+      i.id ASC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_inventory (drug_id, drug_code, drug_name, location_no, batch_no, category, specification, dosage_form, manufacturer, quantity, unit, purchase_amount, retail_amount, expire_date, warning_stock, created_at, updated_at, deleted)
+    VALUES (#{drugId}, #{drugCode}, #{drugName}, #{locationNo}, #{batchNo}, #{category}, #{specification}, #{dosageForm}, #{manufacturer}, #{quantity}, #{unit}, #{purchaseAmount}, #{retailAmount}, #{expireDate}, #{warningStock}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_inventory
+    <set>
+      <if test="drugId != null">drug_id = #{drugId},</if>
+      <if test="drugCode != null">drug_code = #{drugCode},</if>
+      <if test="drugName != null">drug_name = #{drugName},</if>
+      <if test="locationNo != null">location_no = #{locationNo},</if>
+      <if test="batchNo != null">batch_no = #{batchNo},</if>
+      <if test="category != null">category = #{category},</if>
+      <if test="specification != null">specification = #{specification},</if>
+      <if test="dosageForm != null">dosage_form = #{dosageForm},</if>
+      <if test="manufacturer != null">manufacturer = #{manufacturer},</if>
+      <if test="quantity != null">quantity = #{quantity},</if>
+      <if test="unit != null">unit = #{unit},</if>
+      <if test="purchaseAmount != null">purchase_amount = #{purchaseAmount},</if>
+      <if test="retailAmount != null">retail_amount = #{retailAmount},</if>
+      <if test="expireDate != null">expire_date = #{expireDate},</if>
+      <if test="warningStock != null">warning_stock = #{warningStock},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_inventory
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

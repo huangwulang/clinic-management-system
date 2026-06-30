@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.ChargeOrderMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.ChargeOrder">
+    SELECT id, order_no, registration_id, patient_id, patient_name,
+           (SELECT p.gender FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS gender,
+           (SELECT p.age FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS age,
+           (SELECT p.phone FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS phone,
+           charge_type, department_name, doctor_name, receivable_amount, discount_amount, paid_amount, refund_amount, pay_method, refund_method, status, cashier, paid_at, refunded_at, remark, created_at, updated_at, deleted
+    FROM clinic_charge_order
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%') OR charge_type LIKE CONCAT('%', #{keyword}, '%') OR status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_charge_order
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%') OR charge_type LIKE CONCAT('%', #{keyword}, '%') OR status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectPageByChargeType" resultType="com.guet.clinic.pojo.entity.ChargeOrder">
+    SELECT id, order_no, registration_id, patient_id, patient_name,
+           (SELECT p.gender FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS gender,
+           (SELECT p.age FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS age,
+           (SELECT p.phone FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS phone,
+           charge_type, department_name, doctor_name, receivable_amount, discount_amount, paid_amount, refund_amount, pay_method, refund_method, status, cashier, paid_at, refunded_at, remark, created_at, updated_at, deleted
+    FROM clinic_charge_order
+    WHERE deleted = 0
+      AND charge_type = #{chargeType}
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%') OR status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countByChargeType" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_charge_order
+    WHERE deleted = 0
+      AND charge_type = #{chargeType}
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR patient_name LIKE CONCAT('%', #{keyword}, '%') OR status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.ChargeOrder">
+    SELECT id, order_no, registration_id, patient_id, patient_name,
+           (SELECT p.gender FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS gender,
+           (SELECT p.age FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS age,
+           (SELECT p.phone FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS phone,
+           charge_type, department_name, doctor_name, receivable_amount, discount_amount, paid_amount, refund_amount, pay_method, refund_method, status, cashier, paid_at, refunded_at, remark, created_at, updated_at, deleted
+    FROM clinic_charge_order
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <select id="selectByPatientId" resultType="com.guet.clinic.pojo.entity.ChargeOrder">
+    SELECT id, order_no, registration_id, patient_id, patient_name,
+           (SELECT p.gender FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS gender,
+           (SELECT p.age FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS age,
+           (SELECT p.phone FROM clinic_patient p WHERE p.id = patient_id AND p.deleted = 0 LIMIT 1) AS phone,
+           charge_type, department_name, doctor_name, receivable_amount, discount_amount, paid_amount, refund_amount, pay_method, refund_method, status, cashier, paid_at, refunded_at, remark, created_at, updated_at, deleted
+    FROM clinic_charge_order
+    WHERE patient_id = #{patientId} AND deleted = 0
+    ORDER BY created_at DESC, id DESC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_charge_order (order_no, registration_id, patient_id, patient_name, charge_type, department_name, doctor_name, receivable_amount, discount_amount, paid_amount, refund_amount, pay_method, refund_method, status, cashier, paid_at, refunded_at, remark, created_at, updated_at, deleted)
+    VALUES (#{orderNo}, #{registrationId}, #{patientId}, #{patientName}, #{chargeType}, #{departmentName}, #{doctorName}, #{receivableAmount}, #{discountAmount}, #{paidAmount}, #{refundAmount}, #{payMethod}, #{refundMethod}, #{status}, #{cashier}, #{paidAt}, #{refundedAt}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_charge_order
+    <set>
+      <if test="orderNo != null">order_no = #{orderNo},</if>
+      <if test="registrationId != null">registration_id = #{registrationId},</if>
+      <if test="patientId != null">patient_id = #{patientId},</if>
+      <if test="patientName != null">patient_name = #{patientName},</if>
+      <if test="chargeType != null">charge_type = #{chargeType},</if>
+      <if test="departmentName != null">department_name = #{departmentName},</if>
+      <if test="doctorName != null">doctor_name = #{doctorName},</if>
+      <if test="receivableAmount != null">receivable_amount = #{receivableAmount},</if>
+      <if test="discountAmount != null">discount_amount = #{discountAmount},</if>
+      <if test="paidAmount != null">paid_amount = #{paidAmount},</if>
+      <if test="refundAmount != null">refund_amount = #{refundAmount},</if>
+      <if test="payMethod != null">pay_method = #{payMethod},</if>
+      <if test="refundMethod != null">refund_method = #{refundMethod},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="cashier != null">cashier = #{cashier},</if>
+      <if test="paidAt != null">paid_at = #{paidAt},</if>
+      <if test="refundedAt != null">refunded_at = #{refundedAt},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_charge_order
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

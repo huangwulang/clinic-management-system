@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.MemberMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Member">
+    SELECT id, patient_id, card_no, patient_name, phone, member_type, level_name, total_consume, balance, total_stored, points, open_date, expire_date, status, created_at, updated_at, deleted
+    FROM clinic_member
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (patient_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR level_name LIKE CONCAT('%', #{keyword}, '%') OR card_no LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_member
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (patient_name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR level_name LIKE CONCAT('%', #{keyword}, '%') OR card_no LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Member">
+    SELECT id, patient_id, card_no, patient_name, phone, member_type, level_name, total_consume, balance, total_stored, points, open_date, expire_date, status, created_at, updated_at, deleted
+    FROM clinic_member
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <select id="selectByPatientId" resultType="com.guet.clinic.pojo.entity.Member">
+    SELECT id, patient_id, card_no, patient_name, phone, member_type, level_name, total_consume, balance, total_stored, points, open_date, expire_date, status, created_at, updated_at, deleted
+    FROM clinic_member
+    WHERE patient_id = #{patientId} AND deleted = 0
+    LIMIT 1
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_member (patient_id, card_no, patient_name, phone, member_type, level_name, total_consume, balance, total_stored, points, open_date, expire_date, status, created_at, updated_at, deleted)
+    VALUES (#{patientId}, #{cardNo}, #{patientName}, #{phone}, #{memberType}, #{levelName}, #{totalConsume}, #{balance}, #{totalStored}, #{points}, #{openDate}, #{expireDate}, #{status}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_member
+    <set>
+      <if test="patientId != null">patient_id = #{patientId},</if>
+      <if test="cardNo != null">card_no = #{cardNo},</if>
+      <if test="patientName != null">patient_name = #{patientName},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="memberType != null">member_type = #{memberType},</if>
+      <if test="levelName != null">level_name = #{levelName},</if>
+      <if test="totalConsume != null">total_consume = #{totalConsume},</if>
+      <if test="balance != null">balance = #{balance},</if>
+      <if test="totalStored != null">total_stored = #{totalStored},</if>
+      <if test="points != null">points = #{points},</if>
+      <if test="openDate != null">open_date = #{openDate},</if>
+      <if test="expireDate != null or levelName != null">expire_date = #{expireDate},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_member
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

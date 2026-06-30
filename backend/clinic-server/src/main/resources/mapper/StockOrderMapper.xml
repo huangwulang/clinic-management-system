@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.StockOrderMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.StockOrder">
+    SELECT id, order_no, stock_direction, stock_type, supplier_id, supplier_name, maker, purchase_amount, retail_amount, operator, audit_status, audit_at, remark, created_at, updated_at, deleted
+    FROM clinic_stock_order
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR stock_type LIKE CONCAT('%', #{keyword}, '%') OR supplier_name LIKE CONCAT('%', #{keyword}, '%') OR audit_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_stock_order
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR stock_type LIKE CONCAT('%', #{keyword}, '%') OR supplier_name LIKE CONCAT('%', #{keyword}, '%') OR audit_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectPageByDirection" resultType="com.guet.clinic.pojo.entity.StockOrder">
+    SELECT id, order_no, stock_direction, stock_type, supplier_id, supplier_name, maker, purchase_amount, retail_amount, operator, audit_status, audit_at, remark, created_at, updated_at, deleted
+    FROM clinic_stock_order
+    WHERE deleted = 0
+      AND stock_direction = #{stockDirection}
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR stock_type LIKE CONCAT('%', #{keyword}, '%') OR supplier_name LIKE CONCAT('%', #{keyword}, '%') OR audit_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+      <if test="stockType != null and stockType != ''">
+        <choose>
+          <when test="stockType == 'PURCHASE_IN'">
+            AND stock_type IN ('PURCHASE_IN', '采购入库')
+          </when>
+          <when test="stockType == 'RETURN_IN'">
+            AND stock_type IN ('RETURN_IN', '退货入库')
+          </when>
+          <when test="stockType == 'OTHER_IN'">
+            AND stock_type IN ('OTHER_IN', '其他入库', '其它入库')
+          </when>
+          <when test="stockType == 'DEPARTMENT_OUT'">
+            AND stock_type IN ('DEPARTMENT_OUT', '科室领药', '门诊领用')
+          </when>
+          <when test="stockType == 'DAMAGE_OUT'">
+            AND stock_type IN ('DAMAGE_OUT', '报损出库')
+          </when>
+          <when test="stockType == 'PURCHASE_RETURN_OUT'">
+            AND stock_type IN ('PURCHASE_RETURN_OUT', '采购退货', '采购出库')
+          </when>
+          <otherwise>
+            AND stock_type = #{stockType}
+          </otherwise>
+        </choose>
+      </if>
+      <if test="auditStatus != null and auditStatus != ''">
+        <choose>
+          <when test="auditStatus == 'PENDING'">
+            AND (audit_status IS NULL OR audit_status IN ('PENDING', 'PENDING_AUDIT', '未通过', '未审核'))
+          </when>
+          <when test="auditStatus == 'APPROVED'">
+            AND audit_status IN ('APPROVED', 'AUDIT_APPROVED', '审核通过')
+          </when>
+          <when test="auditStatus == 'REJECTED'">
+            AND audit_status IN ('REJECTED', 'AUDIT_REJECTED', '审核未通过')
+          </when>
+          <otherwise>
+            AND audit_status = #{auditStatus}
+          </otherwise>
+        </choose>
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countByDirection" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_stock_order
+    WHERE deleted = 0
+      AND stock_direction = #{stockDirection}
+      <if test="keyword != null and keyword != ''">
+        AND (order_no LIKE CONCAT('%', #{keyword}, '%') OR stock_type LIKE CONCAT('%', #{keyword}, '%') OR supplier_name LIKE CONCAT('%', #{keyword}, '%') OR audit_status LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+      <if test="stockType != null and stockType != ''">
+        <choose>
+          <when test="stockType == 'PURCHASE_IN'">
+            AND stock_type IN ('PURCHASE_IN', '采购入库')
+          </when>
+          <when test="stockType == 'RETURN_IN'">
+            AND stock_type IN ('RETURN_IN', '退货入库')
+          </when>
+          <when test="stockType == 'OTHER_IN'">
+            AND stock_type IN ('OTHER_IN', '其他入库', '其它入库')
+          </when>
+          <when test="stockType == 'DEPARTMENT_OUT'">
+            AND stock_type IN ('DEPARTMENT_OUT', '科室领药', '门诊领用')
+          </when>
+          <when test="stockType == 'DAMAGE_OUT'">
+            AND stock_type IN ('DAMAGE_OUT', '报损出库')
+          </when>
+          <when test="stockType == 'PURCHASE_RETURN_OUT'">
+            AND stock_type IN ('PURCHASE_RETURN_OUT', '采购退货', '采购出库')
+          </when>
+          <otherwise>
+            AND stock_type = #{stockType}
+          </otherwise>
+        </choose>
+      </if>
+      <if test="auditStatus != null and auditStatus != ''">
+        <choose>
+          <when test="auditStatus == 'PENDING'">
+            AND (audit_status IS NULL OR audit_status IN ('PENDING', 'PENDING_AUDIT', '未通过', '未审核'))
+          </when>
+          <when test="auditStatus == 'APPROVED'">
+            AND audit_status IN ('APPROVED', 'AUDIT_APPROVED', '审核通过')
+          </when>
+          <when test="auditStatus == 'REJECTED'">
+            AND audit_status IN ('REJECTED', 'AUDIT_REJECTED', '审核未通过')
+          </when>
+          <otherwise>
+            AND audit_status = #{auditStatus}
+          </otherwise>
+        </choose>
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.StockOrder">
+    SELECT id, order_no, stock_direction, stock_type, supplier_id, supplier_name, maker, purchase_amount, retail_amount, operator, audit_status, audit_at, remark, created_at, updated_at, deleted
+    FROM clinic_stock_order
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_stock_order (order_no, stock_direction, stock_type, supplier_id, supplier_name, maker, purchase_amount, retail_amount, operator, audit_status, audit_at, remark, created_at, updated_at, deleted)
+    VALUES (#{orderNo}, #{stockDirection}, #{stockType}, #{supplierId}, #{supplierName}, #{maker}, #{purchaseAmount}, #{retailAmount}, #{operator}, #{auditStatus}, #{auditAt}, #{remark}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_stock_order
+    <set>
+      <if test="orderNo != null">order_no = #{orderNo},</if>
+      <if test="stockDirection != null">stock_direction = #{stockDirection},</if>
+      <if test="stockType != null">stock_type = #{stockType},</if>
+      <if test="supplierId != null">supplier_id = #{supplierId},</if>
+      <if test="supplierName != null">supplier_name = #{supplierName},</if>
+      <if test="maker != null">maker = #{maker},</if>
+      <if test="purchaseAmount != null">purchase_amount = #{purchaseAmount},</if>
+      <if test="retailAmount != null">retail_amount = #{retailAmount},</if>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="auditStatus != null">audit_status = #{auditStatus},</if>
+      <if test="auditAt != null">audit_at = #{auditAt},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_stock_order
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

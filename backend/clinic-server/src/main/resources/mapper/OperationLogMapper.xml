@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.OperationLogMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.OperationLog">
+    SELECT id, operator, module, operation, request_uri, request_method, request_params, ip, duration, result, error_message, created_at, updated_at, deleted FROM sys_operation_log WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (operator LIKE CONCAT('%', #{keyword}, '%') OR module LIKE CONCAT('%', #{keyword}, '%') OR operation LIKE CONCAT('%', #{keyword}, '%') OR request_uri LIKE CONCAT('%', #{keyword}, '%'))</if>
+    ORDER BY id DESC LIMIT #{size} OFFSET #{offset}
+  </select>
+  <select id="count" resultType="long">
+    SELECT COUNT(1) FROM sys_operation_log WHERE deleted = 0
+    <if test="keyword != null and keyword != ''">AND (operator LIKE CONCAT('%', #{keyword}, '%') OR module LIKE CONCAT('%', #{keyword}, '%') OR operation LIKE CONCAT('%', #{keyword}, '%') OR request_uri LIKE CONCAT('%', #{keyword}, '%'))</if>
+  </select>
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.OperationLog">
+    SELECT id, operator, module, operation, request_uri, request_method, request_params, ip, duration, result, error_message, created_at, updated_at, deleted FROM sys_operation_log WHERE id = #{id} AND deleted = 0
+  </select>
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO sys_operation_log (operator, module, operation, request_uri, request_method, request_params, ip, duration, result, error_message, created_at, updated_at, deleted)
+    VALUES (#{operator}, #{module}, #{operation}, #{requestUri}, #{requestMethod}, #{requestParams}, #{ip}, #{duration}, #{result}, #{errorMessage}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+  <update id="update">
+    UPDATE sys_operation_log<set>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="module != null">module = #{module},</if>
+      <if test="operation != null">operation = #{operation},</if>
+      <if test="requestUri != null">request_uri = #{requestUri},</if>
+      <if test="requestMethod != null">request_method = #{requestMethod},</if>
+      <if test="requestParams != null">request_params = #{requestParams},</if>
+      <if test="ip != null">ip = #{ip},</if>
+      <if test="duration != null">duration = #{duration},</if>
+      <if test="result != null">result = #{result},</if>
+      <if test="errorMessage != null">error_message = #{errorMessage},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+    </set>WHERE id = #{id} AND deleted = 0
+  </update>
+  <update id="softDelete">UPDATE sys_operation_log SET deleted = 1, updated_at = NOW() WHERE id = #{id}</update>
+</mapper>

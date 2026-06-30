@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.PatientMapper">
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Patient">
+    SELECT p.id, p.patient_code, p.name, p.card_no, p.age, p.birthday, p.gender, p.phone, p.id_card,
+           p.source,
+           CASE COALESCE(m.member_type, p.member_level)
+             WHEN '普通会员' THEN 'VIP1'
+             WHEN '初级会员' THEN 'VIP1'
+             WHEN '高级会员' THEN 'VIP2'
+             WHEN '白银会员' THEN 'VIP3'
+             WHEN '黄金会员' THEN 'VIP4'
+             WHEN '钻石会员' THEN 'VIP5'
+             WHEN '非会员' THEN '非会员'
+             ELSE COALESCE(m.level_name, p.member_level, '非会员')
+           END AS member_level,
+           p.member_expire_date,
+           p.nation, p.marriage, p.education, p.province_city, p.address, p.job, p.company, p.remark,
+           p.operator, p.created_at, p.updated_at, p.deleted
+    FROM clinic_patient p
+    LEFT JOIN clinic_member m ON m.patient_id = p.id AND m.deleted = 0
+    WHERE p.deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (p.patient_code LIKE CONCAT('%', #{keyword}, '%') OR p.name LIKE CONCAT('%', #{keyword}, '%') OR p.phone LIKE CONCAT('%', #{keyword}, '%') OR p.card_no LIKE CONCAT('%', #{keyword}, '%') OR p.id_card LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY p.id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_patient
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (patient_code LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%') OR phone LIKE CONCAT('%', #{keyword}, '%') OR card_no LIKE CONCAT('%', #{keyword}, '%') OR id_card LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Patient">
+    SELECT p.id, p.patient_code, p.name, p.card_no, p.age, p.birthday, p.gender, p.phone, p.id_card,
+           p.source,
+           COALESCE(
+             (
+               SELECT m.member_type
+               FROM clinic_member m
+               WHERE m.patient_id = p.id AND m.deleted = 0
+               ORDER BY m.id DESC
+               LIMIT 1
+             ),
+             p.member_level,
+             '非会员'
+           ) AS member_level,
+           COALESCE(
+             (
+               SELECT m.expire_date
+               FROM clinic_member m
+               WHERE m.patient_id = p.id AND m.deleted = 0
+               ORDER BY m.id DESC
+               LIMIT 1
+             ),
+             p.member_expire_date
+           ) AS member_expire_date,
+           p.nation, p.marriage, p.education, p.province_city, p.address, p.job, p.company, p.remark,
+           p.operator, p.created_at, p.updated_at, p.deleted
+    FROM clinic_patient p
+    WHERE p.id = #{id} AND p.deleted = 0
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_patient (patient_code, name, card_no, age, birthday, gender, phone, id_card, source, member_level, member_expire_date, nation, marriage, education, province_city, address, job, company, remark, operator, created_at, updated_at, deleted)
+    VALUES (#{patientCode}, #{name}, #{cardNo}, #{age}, #{birthday}, #{gender}, #{phone}, #{idCard}, #{source}, #{memberLevel}, #{memberExpireDate}, #{nation}, #{marriage}, #{education}, #{provinceCity}, #{address}, #{job}, #{company}, #{remark}, #{operator}, #{createdAt}, #{updatedAt}, #{deleted})
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_patient
+    <set>
+      <if test="patientCode != null">patient_code = #{patientCode},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="cardNo != null">card_no = #{cardNo},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="birthday != null">birthday = #{birthday},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="phone != null">phone = #{phone},</if>
+      <if test="idCard != null">id_card = #{idCard},</if>
+      <if test="source != null">source = #{source},</if>
+      <if test="memberLevel != null">member_level = #{memberLevel},</if>
+      <if test="memberExpireDate != null">member_expire_date = #{memberExpireDate},</if>
+      <if test="nation != null">nation = #{nation},</if>
+      <if test="marriage != null">marriage = #{marriage},</if>
+      <if test="education != null">education = #{education},</if>
+      <if test="provinceCity != null">province_city = #{provinceCity},</if>
+      <if test="address != null">address = #{address},</if>
+      <if test="job != null">job = #{job},</if>
+      <if test="company != null">company = #{company},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="operator != null">operator = #{operator},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_patient
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+
+  <update id="updateMemberLevel">
+    UPDATE clinic_patient
+    SET member_level = #{levelCode},
+        member_expire_date = #{expireDate},
+        updated_at = NOW()
+    WHERE id = #{id} AND deleted = 0
+  </update>
+</mapper>

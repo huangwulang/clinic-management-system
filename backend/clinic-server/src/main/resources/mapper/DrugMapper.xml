@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guet.clinic.server.mapper.DrugMapper">
+  <sql id="columns">
+    id, drug_code, barcode, name, pinyin, specification, category, dosage_form, otc, invoice_item,
+    unit, pack_unit, base_ratio, base_unit, dose_ratio, dose_unit, purchase_price, sell_price,
+    manufacturer, approval_no, status, warning_stock, stock_min, stock_max, location_no,
+    expiry_warning_days, allow_split, allow_member_discount, usage_method, single_dose,
+    frequency, default_days, default_total, total_unit, description, remark,
+    created_at, updated_at, deleted
+  </sql>
+
+  <select id="selectPage" resultType="com.guet.clinic.pojo.entity.Drug">
+    SELECT <include refid="columns" />
+    FROM clinic_drug
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (drug_code LIKE CONCAT('%', #{keyword}, '%')
+          OR name LIKE CONCAT('%', #{keyword}, '%')
+          OR pinyin LIKE CONCAT('%', #{keyword}, '%')
+          OR manufacturer LIKE CONCAT('%', #{keyword}, '%')
+          OR category LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_drug
+    WHERE deleted = 0
+      <if test="keyword != null and keyword != ''">
+        AND (drug_code LIKE CONCAT('%', #{keyword}, '%')
+          OR name LIKE CONCAT('%', #{keyword}, '%')
+          OR pinyin LIKE CONCAT('%', #{keyword}, '%')
+          OR manufacturer LIKE CONCAT('%', #{keyword}, '%')
+          OR category LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+  </select>
+
+  <sql id="filterConditions">
+    <if test="keyword != null and keyword != ''">
+      AND (drug_code LIKE CONCAT('%', #{keyword}, '%')
+        OR name LIKE CONCAT('%', #{keyword}, '%')
+        OR pinyin LIKE CONCAT('%', #{keyword}, '%')
+        OR manufacturer LIKE CONCAT('%', #{keyword}, '%'))
+    </if>
+    <if test="category != null and category != ''">
+      <choose>
+        <when test="category == '西/成药'">
+          AND NOT (
+            COALESCE(category, '') LIKE '%中药%'
+            OR COALESCE(category, '') LIKE '%中成药%'
+            OR COALESCE(approval_no, '') LIKE '国药准字Z%'
+          )
+        </when>
+        <when test="category == '中药'">
+          AND (
+            COALESCE(category, '') LIKE '%中药%'
+            OR COALESCE(category, '') LIKE '%中成药%'
+            OR COALESCE(approval_no, '') LIKE '国药准字Z%'
+          )
+        </when>
+        <otherwise>
+          AND category = #{category}
+        </otherwise>
+      </choose>
+    </if>
+    <if test="status != null and status != ''">
+      AND status = #{status}
+    </if>
+    <if test="startDate != null and startDate != ''">
+      AND created_at &gt;= CONCAT(#{startDate}, ' 00:00:00')
+    </if>
+    <if test="endDate != null and endDate != ''">
+      AND created_at &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+    </if>
+  </sql>
+
+  <select id="selectPageByFilters" resultType="com.guet.clinic.pojo.entity.Drug">
+    SELECT <include refid="columns" />
+    FROM clinic_drug
+    WHERE deleted = 0
+    <include refid="filterConditions" />
+    ORDER BY id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countByFilters" resultType="long">
+    SELECT COUNT(1)
+    FROM clinic_drug
+    WHERE deleted = 0
+    <include refid="filterConditions" />
+  </select>
+
+  <select id="selectById" resultType="com.guet.clinic.pojo.entity.Drug">
+    SELECT <include refid="columns" />
+    FROM clinic_drug
+    WHERE id = #{id} AND deleted = 0
+  </select>
+
+  <select id="selectByDrugCode" resultType="com.guet.clinic.pojo.entity.Drug">
+    SELECT <include refid="columns" />
+    FROM clinic_drug
+    WHERE drug_code = #{drugCode}
+    LIMIT 1
+  </select>
+
+  <select id="selectMaxNumericDrugCode" resultType="long">
+    SELECT MAX(CAST(drug_code AS UNSIGNED))
+    FROM clinic_drug
+    WHERE drug_code REGEXP '^[0-9]+$'
+  </select>
+
+  <select id="selectSaleableDrugs" resultType="map">
+    SELECT
+      d.id,
+      d.drug_code AS drugCode,
+      d.name,
+      d.specification,
+      d.category,
+      d.manufacturer,
+      d.unit,
+      COALESCE(d.sell_price, 0) AS sellPrice,
+      COALESCE(SUM(COALESCE(i.quantity, 0)), 0) AS stockQuantity,
+      COALESCE(
+        GROUP_CONCAT(
+          CONCAT(COALESCE(i.quantity, 0), COALESCE(i.unit, d.unit, ''))
+          ORDER BY i.id SEPARATOR ' '
+        ),
+        CONCAT(0, COALESCE(d.unit, ''))
+      ) AS stockText
+    FROM clinic_drug d
+    LEFT JOIN clinic_inventory i
+      ON i.deleted = 0
+      AND (i.drug_id = d.id OR ((i.drug_id IS NULL OR i.drug_id = 0) AND i.drug_code = d.drug_code))
+    WHERE d.deleted = 0
+      AND (d.status IS NULL OR UPPER(d.status) = 'ENABLED' OR d.status = '启用')
+      <if test="keyword != null and keyword != ''">
+        AND (d.drug_code LIKE CONCAT('%', #{keyword}, '%')
+          OR d.name LIKE CONCAT('%', #{keyword}, '%')
+          OR d.pinyin LIKE CONCAT('%', #{keyword}, '%')
+          OR d.manufacturer LIKE CONCAT('%', #{keyword}, '%')
+          OR d.category LIKE CONCAT('%', #{keyword}, '%'))
+      </if>
+    GROUP BY d.id, d.drug_code, d.name, d.specification, d.category, d.manufacturer, d.unit, d.sell_price
+    ORDER BY d.id DESC
+  </select>
+
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO clinic_drug (
+      drug_code, barcode, name, pinyin, specification, category, dosage_form, otc, invoice_item,
+      unit, pack_unit, base_ratio, base_unit, dose_ratio, dose_unit, purchase_price, sell_price,
+      manufacturer, approval_no, status, warning_stock, stock_min, stock_max, location_no,
+      expiry_warning_days, allow_split, allow_member_discount, usage_method, single_dose,
+      frequency, default_days, default_total, total_unit, description, remark,
+      created_at, updated_at, deleted
+    )
+    VALUES (
+      #{drugCode}, #{barcode}, #{name}, #{pinyin}, #{specification}, #{category}, #{dosageForm}, #{otc}, #{invoiceItem},
+      #{unit}, #{packUnit}, #{baseRatio}, #{baseUnit}, #{doseRatio}, #{doseUnit}, #{purchasePrice}, #{sellPrice},
+      #{manufacturer}, #{approvalNo}, #{status}, #{warningStock}, #{stockMin}, #{stockMax}, #{locationNo},
+      #{expiryWarningDays}, #{allowSplit}, #{allowMemberDiscount}, #{usageMethod}, #{singleDose},
+      #{frequency}, #{defaultDays}, #{defaultTotal}, #{totalUnit}, #{description}, #{remark},
+      #{createdAt}, #{updatedAt}, #{deleted}
+    )
+  </insert>
+
+  <update id="update">
+    UPDATE clinic_drug
+    <set>
+      <if test="drugCode != null">drug_code = #{drugCode},</if>
+      <if test="barcode != null">barcode = #{barcode},</if>
+      <if test="name != null">name = #{name},</if>
+      <if test="pinyin != null">pinyin = #{pinyin},</if>
+      <if test="specification != null">specification = #{specification},</if>
+      <if test="category != null">category = #{category},</if>
+      <if test="dosageForm != null">dosage_form = #{dosageForm},</if>
+      <if test="otc != null">otc = #{otc},</if>
+      <if test="invoiceItem != null">invoice_item = #{invoiceItem},</if>
+      <if test="unit != null">unit = #{unit},</if>
+      <if test="packUnit != null">pack_unit = #{packUnit},</if>
+      <if test="baseRatio != null">base_ratio = #{baseRatio},</if>
+      <if test="baseUnit != null">base_unit = #{baseUnit},</if>
+      <if test="doseRatio != null">dose_ratio = #{doseRatio},</if>
+      <if test="doseUnit != null">dose_unit = #{doseUnit},</if>
+      <if test="purchasePrice != null">purchase_price = #{purchasePrice},</if>
+      <if test="sellPrice != null">sell_price = #{sellPrice},</if>
+      <if test="manufacturer != null">manufacturer = #{manufacturer},</if>
+      <if test="approvalNo != null">approval_no = #{approvalNo},</if>
+      <if test="status != null">status = #{status},</if>
+      <if test="warningStock != null">warning_stock = #{warningStock},</if>
+      <if test="stockMin != null">stock_min = #{stockMin},</if>
+      <if test="stockMax != null">stock_max = #{stockMax},</if>
+      <if test="locationNo != null">location_no = #{locationNo},</if>
+      <if test="expiryWarningDays != null">expiry_warning_days = #{expiryWarningDays},</if>
+      <if test="allowSplit != null">allow_split = #{allowSplit},</if>
+      <if test="allowMemberDiscount != null">allow_member_discount = #{allowMemberDiscount},</if>
+      <if test="usageMethod != null">usage_method = #{usageMethod},</if>
+      <if test="singleDose != null">single_dose = #{singleDose},</if>
+      <if test="frequency != null">frequency = #{frequency},</if>
+      <if test="defaultDays != null">default_days = #{defaultDays},</if>
+      <if test="defaultTotal != null">default_total = #{defaultTotal},</if>
+      <if test="totalUnit != null">total_unit = #{totalUnit},</if>
+      <if test="description != null">description = #{description},</if>
+      <if test="remark != null">remark = #{remark},</if>
+      <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+      <if test="deleted != null">deleted = #{deleted},</if>
+    </set>
+    WHERE id = #{id} AND deleted = 0
+  </update>
+
+  <update id="softDelete">
+    UPDATE clinic_drug
+    SET deleted = 1, updated_at = NOW()
+    WHERE id = #{id}
+  </update>
+</mapper>

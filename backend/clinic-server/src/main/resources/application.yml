@@ -1,0 +1,37 @@
+server:
+  port: ${clinic.server.port}
+  servlet:
+    context-path: ${clinic.server.context-path}
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: ${clinic.application.name}
+  datasource:
+    driver-class-name: ${clinic.datasource.driver-class-name}
+    url: jdbc:mysql://${clinic.datasource.host}:${clinic.datasource.port}/${clinic.datasource.database}?useUnicode=true&characterEncoding=utf8&serverTimezone=${clinic.datasource.server-timezone}&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${clinic.datasource.username}
+    password: ${clinic.datasource.password}
+  data:
+    redis:
+      host: ${clinic.redis.host}
+      port: ${clinic.redis.port}
+      database: ${clinic.redis.database}
+      password: ${clinic.redis.password}
+      timeout: ${clinic.redis.timeout}
+  cache:
+    type: redis
+    redis:
+      key-prefix: "${clinic.application.name}:"
+      use-key-prefix: true
+      cache-null-values: false
+  jackson:
+    time-zone: ${clinic.jackson.time-zone}
+    date-format: ${clinic.jackson.date-format}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: com.guet.clinic.pojo.entity
